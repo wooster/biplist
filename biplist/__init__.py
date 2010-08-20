@@ -4,6 +4,10 @@ import datetime
 import plistlib
 from struct import pack, unpack
 
+class Uid(int):
+    """Wrapper around integers for representing UID values."""
+    pass
+
 class InvalidPlistException(Exception):
     pass
 
@@ -73,8 +77,6 @@ class PlistWriter(object):
 
 PlistTrailer = namedtuple('PlistTrailer', 'offsetSize, objectRefSize, offsetCount, topLevelObjectNumber, offsetTableOffset')
 
-class Uid(int):
-    pass
 
 class PlistReader(object):
     file = None
@@ -130,7 +132,6 @@ class PlistReader(object):
         except TypeError, e:
             raise InvalidPlistException(e)
         print "root is:", self.root
-        raise 1
         return self.root
     
     def setCurrentOffsetToObjectNumber(self, objectNumber):
@@ -143,6 +144,13 @@ class PlistReader(object):
         format = (marker_byte >> 4) & 0x0f
         extra = marker_byte & 0x0f
         self.currentOffset += 1
+        
+        def proc_extra(extra):
+            if extra == 0b1111:
+                self.currentOffset += 1
+                extra = self.readObject()
+            return extra
+        
         # bool or fill byte
         if format == 0b0000:
             if extra == 0b1000:
@@ -155,57 +163,41 @@ class PlistReader(object):
                 raise InvalidPlistException("Invalid object found.")
         # int
         elif format == 0b0001:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readInteger(pow(2, extra))
         # real
         elif format == 0b0010:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readReal(extra)
         # date
         elif format == 0b0011 and extra == 0b0011:
             result = self.readDate()
         # data
         elif format == 0b0100:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readData(extra)
         # ascii string
         elif format == 0b0101:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readAsciiString(extra)
         # Unicode string
         elif format == 0b0110:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readUnicode(extra)
         # uid
         elif format == 0b1000:
             result = self.readUid(extra)
         # array
         elif format == 0b1010:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readArray(extra)
         # set
         elif format == 0b1100:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = set(self.readArray(extra))
         # dict
         elif format == 0b1101:
-            if extra == 0b1111:
-                self.currentOffset += 1
-                extra = self.readObject()
+            extra = proc_extra(extra)
             result = self.readDict(extra)
         else:    
             raise InvalidPlistException("Invalid object found: {format: %s, extra: %s}" % (bin(format), bin(extra)))
@@ -316,3 +308,27 @@ class PlistReader(object):
             result += (result << 8) + unpack('!B', data[i])[0]
             i += 1
         return result
+
+class PlistWriter(object):
+    file = None
+    binaryObjects = None
+    offsets = None
+    trailer = None
+    uniques = None
+    
+    def __init__(self, file):
+        self.reset()
+        self.file = file
+
+    def reset(self):
+        self.offsets = []
+        self.trailer = None
+        self.uniques = []
+        
+    def writeRoot(self, root):
+        result = 'bplist00'
+        self.computeUniquesAndOffsets(root)
+        self.file.write(result)
+
+    def computeUniquesAndOffsets(self, obj):
+        pass
