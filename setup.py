@@ -29,7 +29,9 @@ setup(
         'Programming Language :: Python',
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Text Processing :: Markup",
-    ],
+    ],    
+    setup_requires = ['nose'],
+    test_suite = 'nose.collector',
     install_requires = [
     ],
 )
