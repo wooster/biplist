@@ -62,6 +62,9 @@ class TestWritePlist(unittest.TestCase):
             self.fail("None is not a valid key in Cocoa.")
         except InvalidPlistException, e:
             pass
+    
+    def testWriteData(self):
+        self.roundTrip(Data("woohoo"))
 
 if __name__ == '__main__':
     unittest.main()
