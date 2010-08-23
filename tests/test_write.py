@@ -27,7 +27,7 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(set((1, 2, 3)))
     
     def testComplicated(self):
-        root = {'preference':[1, 2, {'hi there':['a', 1, 2, {'yarrrr':123}]}]}
+        root = {'preference':[1, 2, None, {'hi there':['a', 1, 2, {'yarrrr':123}]}]}
         #!! Replace with plutil verification
         writePlist(root, '/var/tmp/d3.plist')
         self.roundTrip(root)
@@ -55,6 +55,13 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(None)
         self.roundTrip({'1':None})
         self.roundTrip([None, None, None])
+    
+    def testBadKeys(self):
+        try:
+            self.roundTrip({None:1})
+            self.fail("None is not a valid key in Cocoa.")
+        except InvalidPlistException, e:
+            pass
 
 if __name__ == '__main__':
     unittest.main()

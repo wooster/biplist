@@ -424,6 +424,9 @@ class PlistWriter(object):
         self.byteCounts = self.byteCounts._replace(**{field:self.byteCounts.__getattribute__(field) + incr})
 
     def computeOffsets(self, obj, asReference=False, isRoot=False):
+        def check_key(key):
+            if key is None:
+                raise InvalidPlistException('Dictionary keys cannot be null in plists.')
         def proc_size(size):
             if size > 0b1110:
                 size += self.intSize(size)
@@ -474,6 +477,7 @@ class PlistWriter(object):
                 size = proc_size(len(obj))
                 self.incrementByteCount('dictBytes', incr=1+size)
                 for key, value in obj.iteritems():
+                    check_key(key)
                     self.computeOffsets(key, asReference=True)
                     self.computeOffsets(value, asReference=True)
         else:
