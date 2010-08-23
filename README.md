@@ -2,9 +2,13 @@ biplist
 =======
 `biplist` is a binary plist parser/generator for Python.
 
+## About
+
 Binary Property List (plist) files provide a faster and smaller serialization
 format for property lists on OS X. This is a library for generating binary
 plists which can be read by OS X, iOS, or other clients.
+
+## API
 
 The API models the `plistlib` API, and will call through to plistlib when
 XML serialization or deserialization is required.
@@ -20,6 +24,8 @@ Date values can only be `datetime.datetime` objects.
 The exceptions `InvalidPlistException` and `NotBinaryPlistException` may be 
 thrown to indicate that the data cannot be serialized or deserialized as
 a binary plist.
+
+## Examples
 
 Plist generation example:
     
