@@ -50,6 +50,11 @@ class TestWritePlist(unittest.TestCase):
     def testWriteToFile(self):
         writePlist([1, 2, 3], '/var/tmp/test.plist')
         self.assertTrue(os.path.exists('/var/tmp/test.plist'))
+    
+    def testNone(self):
+        self.roundTrip(None)
+        self.roundTrip({'1':None})
+        self.roundTrip([None, None, None])
 
 if __name__ == '__main__':
     unittest.main()

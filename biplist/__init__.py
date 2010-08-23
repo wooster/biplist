@@ -83,7 +83,7 @@ def is_stream_binary_plist(stream):
         return False
 
 PlistTrailer = namedtuple('PlistTrailer', 'offsetSize, objectRefSize, offsetCount, topLevelObjectNumber, offsetTableOffset')
-PlistByteCounts = namedtuple('PlistByteCounts', 'boolBytes, intBytes, realBytes, dateBytes, dataBytes, stringBytes, uidBytes, arrayBytes, setBytes, dictBytes')
+PlistByteCounts = namedtuple('PlistByteCounts', 'nullBytes, boolBytes, intBytes, realBytes, dateBytes, dataBytes, stringBytes, uidBytes, arrayBytes, setBytes, dictBytes')
 
 class PlistReader(object):
     file = None
@@ -152,9 +152,11 @@ class PlistReader(object):
                 extra = self.readObject()
             return extra
         
-        # bool or fill byte
+        # bool, null, or fill byte
         if format == 0b0000:
-            if extra == 0b1000:
+            if extra == 0b0000:
+                result = None
+            elif extra == 0b1000:
                 result = False
             elif extra == 0b1001:
                 result = True
@@ -342,7 +344,7 @@ class PlistWriter(object):
         self.file = file
 
     def reset(self):
-        self.byteCounts = PlistByteCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        self.byteCounts = PlistByteCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         self.trailer = PlistTrailer(0, 0, 0, 0, 0)
         
         # A set of all the uniques which have been computed.
@@ -434,7 +436,9 @@ class PlistWriter(object):
             else:
                 self.computedUniques.add(obj)
         
-        if type(obj) == bool:
+        if obj is None:
+            self.incrementByteCount('nullBytes')
+        elif type(obj) == bool:
             self.incrementByteCount('boolBytes')
         elif isinstance(obj, Uid):
             size = self.intSize(obj)
@@ -508,7 +512,9 @@ class PlistWriter(object):
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
         
-        if type(obj) == bool:
+        if obj is None:
+            output += pack('!B', 0b00000000)
+        elif type(obj) == bool:
             if obj is False:
                 output += pack('!B', 0b00001000)
             else:
