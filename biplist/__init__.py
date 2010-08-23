@@ -148,7 +148,7 @@ class PlistReader(object):
         
         def proc_extra(extra):
             if extra == 0b1111:
-                self.currentOffset += 1
+                #self.currentOffset += 1
                 extra = self.readObject()
             return extra
         
@@ -161,7 +161,7 @@ class PlistReader(object):
             elif extra == 0b1111:
                 pass # fill byte
             else:
-                raise InvalidPlistException("Invalid object found.")
+                raise InvalidPlistException("Invalid object found at offset: %d" % (self.currentOffset - 1))
         # int
         elif format == 0b0001:
             extra = proc_extra(extra)
@@ -301,19 +301,32 @@ class PlistReader(object):
     def readUid(self, length):
         return Uid(self.readInteger(length+1))
     
-    def getSizedInteger(self, data, intSize):
+    def getSizedInteger(self, data, bytes):
         result = 0
-        i = 0
-        d_read = ''
-        while i < intSize:
-            d_read += bin(unpack('!B', data[i])[0])
-            result += (result << 8) + unpack('!B', data[i])[0]
-            i += 1
+        # 1, 2, and 4 byte integers are unsigned
+        if bytes == 1:
+            result = unpack('>B', data)[0]
+        elif bytes == 2:
+            result = unpack('>H', data)[0]
+        elif bytes == 4:
+            result = unpack('>L', data)[0]
+        elif bytes == 8:
+            result = unpack('>q', data)[0]
+        else:
+            #!! Doesn't work:
+            i = 0
+            d_read = ''
+            while i < bytes:
+                d_read += bin(unpack('!B', data[i])[0])
+                result += (result << 8) + unpack('!B', data[i])[0]
+                i += 1
         return result
 
 class HashableWrapper(object):
     def __init__(self, value):
         self.value = value
+    def __repr__(self):
+        return "<HashableWrapper: %s>" % self.value
 
 class PlistWriter(object):
     header = 'bplist00bybiplist1.0'
@@ -321,7 +334,6 @@ class PlistWriter(object):
     byteCounts = None
     trailer = None
     computedUniques = None
-    computedReferenceCount = 0
     writtenReferences = None
     referencePositions = None
     
@@ -335,8 +347,6 @@ class PlistWriter(object):
         
         # A set of all the uniques which have been computed.
         self.computedUniques = set()
-        # A count of all the references.
-        self.computedReferenceCount = 0
         # A list of all the uniques which have been written.
         self.writtenReferences = []
         # A dict of the positions of the written uniques.
@@ -367,8 +377,9 @@ class PlistWriter(object):
         """
         output = self.header
         wrapped_root = self.wrapRoot(root)
-        self.computeOffsets(wrapped_root, asReference=True)
-        self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(self.computedReferenceCount)})
+        should_reference_root = True#not isinstance(wrapped_root, HashableWrapper)
+        self.computeOffsets(wrapped_root, asReference=should_reference_root, isRoot=True)
+        self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(len(self.computedUniques))})
         (_, output) = self.writeObjectReference(wrapped_root, output)
         output = self.writeObject(wrapped_root, output, setReferencePosition=True)
         
@@ -376,14 +387,13 @@ class PlistWriter(object):
         # object reference offsets need to be.
         self.trailer = self.trailer._replace(**{
             'offsetSize':self.intSize(len(output)),
-            'offsetCount':self.computedReferenceCount,
+            'offsetCount':len(self.computedUniques),
             'offsetTableOffset':len(output),
             'topLevelObjectNumber':0
             })
         
         output = self.writeOffsetTable(output)
         output += pack('!xxxxxxBBQQQ', *self.trailer)
-        
         self.file.write(output)
     
     def wrapRoot(self, root):
@@ -411,7 +421,7 @@ class PlistWriter(object):
     def incrementByteCount(self, field, incr=1):
         self.byteCounts = self.byteCounts._replace(**{field:self.byteCounts.__getattribute__(field) + incr})
 
-    def computeOffsets(self, obj, asReference=False):
+    def computeOffsets(self, obj, asReference=False, isRoot=False):
         def proc_size(size):
             if size > 0b1110:
                 size += self.intSize(size)
@@ -419,15 +429,10 @@ class PlistWriter(object):
         # If this should be a reference, then we keep a record of it in the
         # uniques table.
         if asReference:
-            # Work around Python detecting if two sets, etc are the same...
-            if isinstance(obj, (HashableWrapper, set)):
-                self.computedReferenceCount += 1
+            if obj in self.computedUniques:
+                return
             else:
-                self.computedReferenceCount += 1
-                if obj in self.computedUniques:
-                    return
-                else:
-                    self.computedUniques.add(obj)
+                self.computedUniques.add(obj)
         
         if type(obj) == bool:
             self.incrementByteCount('boolBytes')
@@ -459,6 +464,7 @@ class PlistWriter(object):
                 size = proc_size(len(obj))
                 self.incrementByteCount('arrayBytes', incr=1+size)
                 for value in obj:
+                    asRef = True
                     self.computeOffsets(value, asReference=True)
             elif isinstance(obj, dict):
                 size = proc_size(len(obj))
@@ -493,10 +499,10 @@ class PlistWriter(object):
         def proc_variable_length(format, length):
             result = ''
             if length > 0b1110:
-               result += pack('!B', (format << 4) | 0b1111)
-               result += self.binaryInt(length)
+                result += pack('!B', (format << 4) | 0b1111)
+                result = self.writeObject(length, result)
             else:
-               result += pack('!B', (format << 4) | length)
+                result += pack('!B', (format << 4) | length)
             return result
         
         if setReferencePosition:
@@ -573,11 +579,13 @@ class PlistWriter(object):
     
     def writeOffsetTable(self, output):
         """Writes all of the object reference offsets."""
+        all_positions = []
         for obj in self.writtenReferences:
             position = self.referencePositions.get(obj, None)
             if position == None:
-                raise InvalidPlistException("Error while writing offsets table. Object not found.")
+                raise InvalidPlistException("Error while writing offsets table. Object not found. %s" % obj)
             output += self.binaryInt(position, self.trailer.offsetSize)
+            all_positions.append(position)
         return output
     
     def binaryReal(self, obj):
@@ -590,7 +598,6 @@ class PlistWriter(object):
         if bytes is None:
             #!! compute actual size
             bytes = self.intSize(obj)
-        
         if bytes == 1:
             result += pack('>B', obj)
         elif bytes == 2:
