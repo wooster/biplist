@@ -1,3 +1,49 @@
+"""biplist -- a library for reading and writing binary property list files.
+
+Binary Property List (plist) files provide a faster and smaller serialization
+format for property lists on OS X. This is a library for generating binary
+plists which can be read by OS X, iOS, or other clients.
+
+The API models the plistlib API, and will call through to plistlib when
+XML serialization or deserialization is required.
+
+To generate plists with UID values, wrap the values with the Uid object. The
+value must be an int.
+
+To generate plists with NSData/CFData values, wrap the values with the
+Data object. The value must be a string.
+
+Date values can only be datetime.datetime objects.
+
+The exceptions InvalidPlistException and NotBinaryPlistException may be 
+thrown to indicate that the data cannot be serialized or deserialized as
+a binary plist.
+
+Plist generation example:
+    
+    from biplist import *
+    from datetime import datetime
+    plist = {'aKey':'aValue',
+             '0':1.322,
+             'now':datetime.now(),
+             'list':[1,2,3],
+             'tuple':('a','b','c')
+             }
+    try:
+        writePlist(plist, "example.plist")
+    except (InvalidPlistException, NotBinaryPlistException), e:
+        print "Something bad happened:", e
+
+Plist parsing example:
+
+    from biplist import *
+    try:
+        plist = readPlist("example.plist")
+        print plist
+    except (InvalidPlistException, NotBinaryPlistException), e:
+        print "Not a plist:", e
+"""
+
 from collections import namedtuple
 from cStringIO import StringIO
 import datetime
@@ -415,7 +461,7 @@ class PlistWriter(object):
                 n.append(self.wrapRoot(value))
             return HashableWrapper(n)
         elif isinstance(root, tuple):
-            n = tuple(*[self.wrapRoot(value) for value in root])
+            n = tuple([self.wrapRoot(value) for value in root])
             return HashableWrapper(n)
         else:
             return root
@@ -452,7 +498,7 @@ class PlistWriter(object):
             size = self.intSize(obj)
             self.incrementByteCount('intBytes', incr=1+size)
         elif isinstance(obj, (float)):
-            size = self.floatSize(obj)
+            size = self.realSize(obj)
             self.incrementByteCount('realBytes', incr=1+size)
         elif isinstance(obj, datetime.datetime):    
             self.incrementByteCount('dateBytes', incr=2)
@@ -625,4 +671,7 @@ class PlistWriter(object):
     
     def intSize(self, obj):
         #!! Should actually calculate size required.
+        return 8
+    
+    def realSize(self, obj):
         return 8
