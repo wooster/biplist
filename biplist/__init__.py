@@ -427,6 +427,8 @@ class PlistWriter(object):
         def check_key(key):
             if key is None:
                 raise InvalidPlistException('Dictionary keys cannot be null in plists.')
+            elif isinstance(key, Data):
+                raise InvalidPlistException('Data cannot be dictionary keys in plists.')
         def proc_size(size):
             if size > 0b1110:
                 size += self.intSize(size)
