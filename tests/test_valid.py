@@ -23,7 +23,6 @@ class TestValidPlistFile(unittest.TestCase):
         try:
             result = readPlist(fixture_path('simple_binary.plist'))
             self.validateSimpleBinaryRoot(result)
-            self.fail('remove me')
         except NotBinaryPlistException, e:
             self.fail("NotBinaryPlistException: %s" % e)
         except InvalidPlistException, e:

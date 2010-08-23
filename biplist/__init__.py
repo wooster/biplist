@@ -20,7 +20,6 @@ class Uid(int):
 class Data(str):
     """Wrapper around str types for representing Data values."""
     pass
-    
 
 class InvalidPlistException(Exception):
     """Raised when the plist is incorrectly formatted."""
@@ -57,8 +56,8 @@ def writePlist(rootObject, pathOrFile, binary=True):
         if isinstance(pathOrFile, (str, unicode)):
             pathOrFile = open(pathOrFile, 'w')
             didOpen = True
-        writer = PlistWriter(pathOrFile, rootObject)
-        result = writer.writeRoot()
+        writer = PlistWriter(pathOrFile)
+        result = writer.writeRoot(rootObject)
         if didOpen:
             pathOrFile.close()
         return result
@@ -71,7 +70,8 @@ def writePlistToString(rootObject, binary=True):
         return plistlib.writePlistToString(rootObject)
     else:
         io = StringIO()
-        writeRoot(rootObject, io)
+        writer = PlistWriter(io)
+        writer.writeRoot(rootObject)
         return io.getvalue()
 
 def is_stream_binary_plist(stream):
@@ -126,11 +126,10 @@ class PlistReader(object):
             offset_size = self.trailer.offsetSize * self.trailer.offsetCount
             offset = self.trailer.offsetTableOffset
             offset_contents = self.contents[offset:offset+offset_size]
-            if len(offset_contents) != self.trailer.offsetCount:
-                raise InvalidPlistException("Invalid offset count. Expcted %d got %d." % (self.trailer.offsetCount, len(offset_contents)))
             offset_i = 0
             while offset_i < self.trailer.offsetCount:
-                tmp_contents = offset_contents[self.trailer.offsetSize*offset_i:]
+                begin = self.trailer.offsetSize*offset_i
+                tmp_contents = offset_contents[begin:begin+self.trailer.offsetSize]
                 tmp_sized = self.getSizedInteger(tmp_contents, self.trailer.offsetSize)
                 self.offsets.append(tmp_sized)
                 offset_i += 1
@@ -318,6 +317,10 @@ class PlistReader(object):
             i += 1
         return result
 
+class HashableWrapper(object):
+    def __init__(self, value):
+        self.value = value
+
 class PlistWriter(object):
     file = None
     byteCounts = None
@@ -327,7 +330,7 @@ class PlistWriter(object):
     uniques = None
     uniquePositions = None
     references = 0
-    header = 'bplist00'
+    header = 'bplist00bybiplist1.0'
     trailer_size = 32
     
     def __init__(self, file):
@@ -338,139 +341,270 @@ class PlistWriter(object):
         self.byteCounts = PlistByteCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         self.offsets = []
         self.serializedUniques = ''
-        self.trailer = PlistTrailer()
+        self.trailer = PlistTrailer(0, 0, 0, 0, 0)
         self.uniques = []
-        self.uniquePositions = []
         self.references = 0
+        
+        # A set of all the uniques which have been computed.
+        self.computedUniques = set()
+        # A count of all the references.
+        self.computedReferenceCount = 0
+        # A list of all the uniques which have been written.
+        self.writtenReferences = []
+        # A dict of the positions of the written uniques.
+        self.referencePositions = {}
+        
+    def positionOfObjectReference(self, obj):
+        """If the given object has been written already, return its
+           position in the offset table. Otherwise, return None."""
+        if obj in self.writtenReferences:
+            return self.writtenReferences.index(obj)
+        return None
         
     def writeRoot(self, root):
         """
         Strategy is:
         - write header
+        - wrap root object so everything is hashable
+        - compute size of objects which will be written
+          - need to do this in order to know how large the object refs
+            will be in the list/dict/set reference lists
         - write objects
+          - keep objects in writtenReferences
+          - keep positions of object references in referencePositions
+          - write object references with the length computed previously
         - computer object reference length
         - write object reference positions
-        - writer trailer
+        - write trailer
         """
-        result = self.header
+        output = self.header
+        wrapped_root = self.wrapRoot(root)
+        self.computeOffsets(wrapped_root, asReference=True)
+        self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(self.computedReferenceCount)})
+        (_, output) = self.writeObjectReference(wrapped_root, output)
+        output = self.writeObject(wrapped_root, output, setReferencePosition=True)
         
+        # output size at this point is an upper bound on how big the
+        # object reference offsets need to be.
+        self.trailer = self.trailer._replace(**{
+            'offsetSize':self.intSize(len(output)),
+            'offsetCount':self.computedReferenceCount,
+            'offsetTableOffset':len(output),
+            'topLevelObjectNumber':0
+            })
         
+        output = self.writeOffsetTable(output)
+        output += pack('!xxxxxxBBQQQ', *self.trailer)
         
+        print "trailer write:", self.trailer
         
-        self.computeUniquesAndOffsets(root)
-        
-        self.trailer.objectRefSize = self.intSize(self.references)
-        ref_size = self.trailer.objectRefSize * self.references
-        #!! trailer_size is uneccesary?
-        file_size = sum(self.byteCounts) + ref_size + len(self.header) + self.trailer_size
-        # Should write offsets after data, so shouldn't require longer length.
-        self.trailer.offsetSize = self.intSize(len(file_size))
-        self.trailer.offsetCount = len(self.uniques)
-        self.trailer.topLevelObjectNumber = 0
-        
-        result = self.serializeObject(root, result)
-        self.trailer.offsetTableOffset = len(result)
-        result += self.serializeOffsets(self.trailer.offsetSize)
-        result += pack('!xxxxxxBBQQQ', *trailer)
-        
-        self.file.write(result)
+        self.file.write(output)
     
-    def intSize(self, obj):
-        #!! Should actually calculate size required.
-        return 8
+    def wrapRoot(self, root):
+        if isinstance(root, set):
+            n = set()
+            for value in root:
+                n.add(self.wrapRoot(value))
+            return HashableWrapper(n)
+        elif isinstance(root, dict):
+            n = {}
+            for key, value in root.iteritems():
+                n[self.wrapRoot(key)] = self.wrapRoot(value)
+            return HashableWrapper(n)
+        elif isinstance(root, list):
+            n = []
+            for value in root:
+                n.append(self.wrapRoot(value))
+            return HashableWrapper(n)
+        elif isinstance(root, tuple):
+            n = tuple(*[self.wrapRoot(value) for value in root])
+            return HashableWrapper(n)
+        else:
+            return root
 
-    def serializeOffsets(self, offsetSize):
-        result = ''
-        for offset in self.offsets:
-            if offsetSize == 1:
-                result += pack('>B', offset)
-            elif offsetSize == 2:
-                result += pack('>H', offset)
-            elif offsetSize == 4:
-                result += pack('>L', offset)
-            elif offsetSize == 8:
-                result += pack('>q', offset)
-        return result
+    def incrementByteCount(self, field, incr=1):
+        self.byteCounts = self.byteCounts._replace(**{field:self.byteCounts.__getattribute__(field) + incr})
 
-    def serializeObject(self, obj, result):    
+    def computeOffsets(self, obj, asReference=False):
+        def proc_size(size):
+            if size > 0b1110:
+                size += self.intSize(size)
+            return size
+        # If this should be a reference, then we keep a record of it in the
+        # uniques table.
+        if asReference:
+            # Work around Python detecting if two sets, etc are the same...
+            if isinstance(obj, (HashableWrapper, set)):
+                self.computedReferenceCount += 1
+            else:
+                self.computedReferenceCount += 1
+                if obj in self.computedUniques:
+                    return
+                else:
+                    self.computedUniques.add(obj)
+        
+        if type(obj) == bool:
+            self.incrementByteCount('boolBytes')
+        elif isinstance(obj, Uid):
+            size = self.intSize(obj)
+            self.incrementByteCount('uidBytes', incr=1+size)
+        elif isinstance(obj, (int, long)):
+            size = self.intSize(obj)
+            self.incrementByteCount('intBytes', incr=1+size)
+        elif isinstance(obj, (float)):
+            size = self.floatSize(obj)
+            self.incrementByteCount('realBytes', incr=1+size)
+        elif isinstance(obj, datetime.datetime):    
+            self.incrementByteCount('dateBytes', incr=2)
+        elif isinstance(obj, Data):
+            size = proc_size(len(obj))
+            self.incrementByteCount('dataBytes', incr=1+size)
+        elif isinstance(obj, (str, unicode)):
+            size = proc_size(len(obj))
+            self.incrementByteCount('stringBytes', incr=1+size)
+        elif isinstance(obj, HashableWrapper):
+            obj = obj.value
+            if isinstance(obj, set):
+                size = proc_size(len(obj))
+                self.incrementByteCount('setBytes', incr=1+size)
+                for value in obj:
+                    self.computeOffsets(value, asReference=True)
+            elif isinstance(obj, (list, tuple)):
+                size = proc_size(len(obj))
+                self.incrementByteCount('arrayBytes', incr=1+size)
+                for value in obj:
+                    self.computeOffsets(value, asReference=True)
+            elif isinstance(obj, dict):
+                size = proc_size(len(obj))
+                self.incrementByteCount('dictBytes', incr=1+size)
+                for key, value in obj.iteritems():
+                    self.computeOffsets(key, asReference=True)
+                    self.computeOffsets(value, asReference=True)
+        else:
+            raise InvalidPlistException("Unknown object type.")
+
+    def writeObjectReference(self, obj, output):
+        """Tries to write an object reference, adding it to the references
+           table. Does not write the actual object bytes or set the reference
+           position. Returns a tuple of whether the object was a new reference
+           (True if it was, False if it already was in the reference table)
+           and the new output.
+        """
+        position = self.positionOfObjectReference(obj)
+        if position is None:
+            self.writtenReferences.append(obj)
+            output += self.binaryInt(len(self.writtenReferences) - 1, bytes=self.trailer.objectRefSize)
+            return (True, output)
+        else:
+            output += self.binaryInt(position, bytes=self.trailer.objectRefSize)
+            return (False, output)
+
+    def writeObject(self, obj, output, setReferencePosition=False):
+        """Serializes the given object to the output. Returns output.
+           If setReferencePosition is True, will set the position the
+           object was written.
+        """
         def proc_variable_length(format, length):
             result = ''
             if length > 0b1110:
-                result += pack('!B', (format << 4) | 0b1111)
-                result += self.binaryInt(length)
+               result += pack('!B', (format << 4) | 0b1111)
+               result += self.binaryInt(length)
             else:
-                result += pack('!B', (format << 4) | length)
+               result += pack('!B', (format << 4) | length)
             return result
-        def proc_unique(unique):
-            result = ''
-            if isinstance(unique, (str, unicode, Data)):
-                raise NotImplementedError("hmmm")
-            else:
-                raise NotImplementedError("hmmm")
-            return result
+        
+        if setReferencePosition:
+            self.referencePositions[obj] = len(output)
         
         if type(obj) == bool:
             if obj is False:
-                result += pack('!B', b00001000)
+                output += pack('!B', 0b00001000)
             else:
-                result += pack('!B', b00001001)
+                output += pack('!B', 0b00001001)
         elif isinstance(obj, Uid):
             size = self.intSize(obj)
-            result += pack('!B', (0b1000 << 4) | size - 1)
-            result += self.binaryInt(Uid)
+            output += pack('!B', (0b1000 << 4) | size - 1)
+            output += self.binaryInt(Uid)
         elif isinstance(obj, (int, long)):
             bytes = self.intSize(obj)
             root = math.log(bytes, 2)
-            result += pack('!B', (0b0001 << 4) | root)
-            result += self.binaryInt(obj)
+            output += pack('!B', (0b0001 << 4) | int(root))
+            output += self.binaryInt(obj)
         elif isinstance(obj, float):
             # just use doubles
-            result += pack('!B', (0b0010 << 4) | 3)
-            result += self.binaryReal(obj)
+            output += pack('!B', (0b0010 << 4) | 3)
+            output += self.binaryReal(obj)
         elif isinstance(obj, datetime.datetime):
             timestamp = time.mktime(obj.timetuple())
             timestamp -= apple_reference_date_offset
-            result += pack('!B', 0b00110011)
-            result += pack('!d', float(timestamp))
+            output += pack('!B', 0b00110011)
+            output += pack('!d', float(timestamp))
         elif isinstance(obj, Data):
-            result += proc_variable_length(0b0100, len(obj))
-            result += obj
+            output += proc_variable_length(0b0100, len(obj))
+            output += obj
         elif isinstance(obj, (str, unicode)):
             if isinstance(obj, unicode):
                 bytes = obj.encode('utf-16be')
-                result += proc_variable_length(0b0110, len(bytes))
+                output += proc_variable_length(0b0110, len(bytes))
             else:
                 bytes = obj
-                result += proc_variable_length(0b0101, len(bytes))
-            result += bytes
-        elif isinstance(obj, set):
-            result += proc_variable_length(0b1100, len(obj))
-            for unique in obj:
-                result += proc_unique(unique)
-        elif isinstance(obj, (list, tuple)):
-            result += proc_variable_length(0b1010, len(obj))
-            for unique in obj:
-                result += proc_unique(unique)
-        elif isinstance(obj, dict):
-            result += proc_variable_length(0b1101, len(obj))
-            keys = []
-            values = []
-            for key, value in obj.iteritems():
-                keys.append(key)
-                values.append(value)
-            for key in keys:
-                result += proc_unique(key)
-            for value in values:
-                result += proc_unique(value)
-        return result
+                output += proc_variable_length(0b0101, len(bytes))
+                output += bytes
+        elif isinstance(obj, HashableWrapper):
+            obj = obj.value
+            if isinstance(obj, (set, list, tuple)):
+                if isinstance(obj, set):
+                    output += proc_variable_length(0b1100, len(obj))
+                else:
+                    output += proc_variable_length(0b1010, len(obj))
+            
+                objectsToWrite = []
+                for objRef in obj:
+                    (isNew, output) = self.writeObjectReference(objRef, output)
+                    if isNew:
+                        objectsToWrite.append(objRef)
+                for objRef in obj:
+                    output = self.writeObject(objRef, output, setReferencePosition=True)
+            elif isinstance(obj, dict):
+                output += proc_variable_length(0b1101, len(obj))
+                keys = []
+                values = []
+                objectsToWrite = []
+                for key, value in obj.iteritems():
+                    keys.append(key)
+                    values.append(value)
+                for key in keys:
+                    (isNew, output) = self.writeObjectReference(key, output)
+                    if isNew:
+                        objectsToWrite.append(key)
+                for value in values:
+                    (isNew, output) = self.writeObjectReference(value, output)
+                    if isNew:
+                        objectsToWrite.append(value)
+                for objRef in objectsToWrite:
+                    output = self.writeObject(objRef, output, setReferencePosition=True)
+        return output
+    
+    def writeOffsetTable(self, output):
+        """Writes all of the object reference offsets."""
+        for obj in self.writtenReferences:
+            position = self.referencePositions.get(obj, None)
+            if position == None:
+                raise InvalidPlistException("Error while writing offsets table. Object not found.")
+            output += self.binaryInt(position, self.trailer.offsetSize)
+        return output
     
     def binaryReal(self, obj):
         # just use doubles
         result = pack('>d', obj)
         return result
     
-    def binaryInt(self, obj):
+    def binaryInt(self, obj, bytes=None):
         result = ''
+        if bytes is None:
+            #!! compute actual size
+            bytes = self.intSize(obj)
+        
         if bytes == 1:
             result += pack('>B', obj)
         elif bytes == 2:
@@ -483,54 +617,7 @@ class PlistWriter(object):
             #!! Uh... what to do here?
             raise NotImplementedError("Not sure how to do this yet.")
         return result
-
-    def computeUniquesAndOffsets(self, obj):
-        def proc_size(size):
-            if size > 0b1110:
-                size += self.intSize(size)
-            return size
-        
-        if type(obj) == bool:
-            self.byteCounts.boolBytes += 1
-        elif isinstance(obj, Uid):
-            size = self.intSize(obj)
-            self.byteCounts.uidBytes += 1 + size
-        elif isinstance(obj, (int, long)):
-            size = self.intSize(obj)
-            self.byteCounts.intBytes += 1 + size
-        elif isinstance(obj, (float)):
-            size = self.floatSize(obj)
-            self.byteCounts.realBytes += 1 + size
-        elif isinstance(obj, datetime.datetime):
-            self.byteCounts.dateBytes += 2
-        elif isinstance(obj, Data):
-            if obj not in self.uniques:
-                size = proc_size(len(obj))
-                self.byteCounts.dataBytes += 1 + size
-                self.uniques.append(obj)
-        elif isinstance(obj, (str, unicode)):
-            if obj not in self.uniques:
-                size = proc_size(len(obj))
-                self.byteCounts.stringBytes += 1 + size
-                self.uniques.append(obj)
-        elif isinstance(obj, set):
-            size = proc_size(len(obj))
-            self.byteCounts.setBytes += 1 + size
-            for value in obj:
-                self.references += 1
-                self.computeUniquesAndOffsets(value)
-        elif isinstance(obj, (list, tuple)):
-            size = proc_size(len(obj))
-            self.byteCounts.arrayBytes += 1 + size
-            for value in obj:
-                self.references += 1
-                self.computeUniquesAndOffsets(value)
-        elif isinstance(obj, dict):
-            size = proc_size(len(obj))
-            self.byteCounts.dictBytes += 1 + size
-            for key, value in obj.iteritems():
-                self.references += 2
-                self.computeUniquesAndOffsets(key)
-                self.computeUniquesAndOffsets(value)
-        else:
-            raise InvalidPlistException("Unknown object type.")
+    
+    def intSize(self, obj):
+        #!! Should actually calculate size required.
+        return 8
