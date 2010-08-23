@@ -1,6 +1,8 @@
 from biplist import *
 import datetime
 import os
+import subprocess
+import tempfile
 from test_utils import *
 import unittest
 
@@ -13,6 +15,17 @@ class TestWritePlist(unittest.TestCase):
         self.assertTrue(len(plist) > 0)
         readResult = readPlistFromString(plist)
         self.assertEquals(readResult, root)
+        self.lintPlist(plist)
+    
+    def lintPlist(self, plistString):
+        if os.path.exists('/usr/bin/plutil'):
+            f = tempfile.NamedTemporaryFile()
+            f.write(plistString)
+            f.flush()
+            name = f.name
+            (status, output) = run_command(['/usr/bin/plutil', '-lint', name])
+            if status != 0:
+                self.fail("plutil verification failed (status %d): %s" % (status, output))
     
     def testBoolRoot(self):
         self.roundTrip(True)
@@ -37,8 +50,7 @@ class TestWritePlist(unittest.TestCase):
     
     def testComplicated(self):
         root = {'preference':[1, 2, {'hi there':['a', 1, 2, {'yarrrr':123}]}]}
-        #!! Replace with plutil verification
-        writePlist(root, '/var/tmp/d3.plist')
+        self.lintPlist(writePlistToString(root))
         self.roundTrip(root)
     
     def testString(self):
@@ -48,8 +60,6 @@ class TestWritePlist(unittest.TestCase):
         d = {}
         for i in xrange(0, 1000):
             d['%d' % i] = '%d' % i
-        #!! Replace with plutil verification
-        writePlist(d, '/var/tmp/d.plist')
         self.roundTrip(d)
     
     def testUniques(self):
@@ -57,8 +67,10 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(root)
     
     def testWriteToFile(self):
-        writePlist([1, 2, 3], '/var/tmp/test.plist')
-        self.assertTrue(os.path.exists('/var/tmp/test.plist'))
+        path = '/var/tmp/test.plist'
+        writePlist([1, 2, 3], path)
+        self.assertTrue(os.path.exists(path))
+        self.lintPlist(open(path).read())
     
     def testNone(self):
         self.roundTrip(None)
