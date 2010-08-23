@@ -21,7 +21,7 @@ class TestValidPlistFile(unittest.TestCase):
         
     def test_file_read(self):
         try:
-            result = readPlist(fixture_path('simple_binary.plist'))
+            result = readPlist(data_path('simple_binary.plist'))
             self.validateSimpleBinaryRoot(result)
         except NotBinaryPlistException, e:
             self.fail("NotBinaryPlistException: %s" % e)
