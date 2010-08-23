@@ -122,7 +122,6 @@ class PlistReader(object):
         trailerContents = self.contents[-32:]
         try:
             self.trailer = PlistTrailer._make(unpack("!xxxxxxBBQQQ", trailerContents))
-            print "trailer:", self.trailer
             offset_size = self.trailer.offsetSize * self.trailer.offsetCount
             offset = self.trailer.offsetTableOffset
             offset_contents = self.contents[offset:offset+offset_size]
@@ -135,10 +134,8 @@ class PlistReader(object):
                 offset_i += 1
             self.setCurrentOffsetToObjectNumber(self.trailer.topLevelObjectNumber)
             self.root = self.readObject()
-            print self.offsets
         except TypeError, e:
             raise InvalidPlistException(e)
-        print "root is:", self.root
         return self.root
     
     def setCurrentOffsetToObjectNumber(self, objectNumber):
@@ -395,8 +392,6 @@ class PlistWriter(object):
         
         output = self.writeOffsetTable(output)
         output += pack('!xxxxxxBBQQQ', *self.trailer)
-        
-        print "trailer write:", self.trailer
         
         self.file.write(output)
     
