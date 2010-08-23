@@ -26,6 +26,15 @@ class TestWritePlist(unittest.TestCase):
     def testSetRoot(self):
         self.roundTrip(set((1, 2, 3)))
     
+    def testFloat(self):
+        self.roundTrip({'aFloat':1.23})
+    
+    def testTuple(self):
+        result = writePlistToString({'aTuple':(1, 2.0, 'a')})
+        self.assertTrue(len(result) > 0)
+        readResult = readPlistFromString(result)
+        self.assertEquals(readResult['aTuple'], [1, 2.0, 'a'])
+    
     def testComplicated(self):
         root = {'preference':[1, 2, {'hi there':['a', 1, 2, {'yarrrr':123}]}]}
         #!! Replace with plutil verification
