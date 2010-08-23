@@ -89,9 +89,7 @@ class PlistReader(object):
     file = None
     contents = ''
     offsets = None
-    root = None
     trailer = None
-    uniques = None
     currentOffset = 0
     
     def __init__(self, fileOrStream):
@@ -106,11 +104,10 @@ class PlistReader(object):
         self.trailer = None
         self.contents = ''
         self.offsets = []
-        self.uniques = []
-        self.root = None
         self.currentOffset = 0
     
     def readRoot(self):
+        result = None
         self.reset()
         # Get the header, make sure it's a valid file.
         if not is_stream_binary_plist(self.file):
@@ -133,10 +130,10 @@ class PlistReader(object):
                 self.offsets.append(tmp_sized)
                 offset_i += 1
             self.setCurrentOffsetToObjectNumber(self.trailer.topLevelObjectNumber)
-            self.root = self.readObject()
+            result = self.readObject()
         except TypeError, e:
             raise InvalidPlistException(e)
-        return self.root
+        return result
     
     def setCurrentOffsetToObjectNumber(self, objectNumber):
         self.currentOffset = self.offsets[objectNumber]
@@ -319,16 +316,14 @@ class HashableWrapper(object):
         self.value = value
 
 class PlistWriter(object):
+    header = 'bplist00bybiplist1.0'
     file = None
     byteCounts = None
-    offsets = None
-    serializedUniques = None
     trailer = None
-    uniques = None
-    uniquePositions = None
-    references = 0
-    header = 'bplist00bybiplist1.0'
-    trailer_size = 32
+    computedUniques = None
+    computedReferenceCount = 0
+    writtenReferences = None
+    referencePositions = None
     
     def __init__(self, file):
         self.reset()
@@ -336,11 +331,7 @@ class PlistWriter(object):
 
     def reset(self):
         self.byteCounts = PlistByteCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        self.offsets = []
-        self.serializedUniques = ''
         self.trailer = PlistTrailer(0, 0, 0, 0, 0)
-        self.uniques = []
-        self.references = 0
         
         # A set of all the uniques which have been computed.
         self.computedUniques = set()
