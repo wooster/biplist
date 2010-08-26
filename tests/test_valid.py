@@ -27,6 +27,10 @@ class TestValidPlistFile(unittest.TestCase):
             self.fail("NotBinaryPlistException: %s" % e)
         except InvalidPlistException, e:
             self.fail("InvalidPlistException: %s" % e)
+    
+    def testUnicodeRoot(self):
+        result = readPlist(data_path('unicode_root.plist'))
+        self.assertEquals(result, u"Mirror's Edge\u2122 for iPad")
         
 if __name__ == '__main__':
     unittest.main()

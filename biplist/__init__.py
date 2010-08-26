@@ -50,6 +50,7 @@ import datetime
 import math
 import plistlib
 from struct import pack, unpack
+import sys
 import time
 
 __all__ = [
@@ -324,10 +325,11 @@ class PlistReader(object):
         return result
     
     def readUnicode(self, length):
-        data = self.contents[self.currentOffset:self.currentOffset+length*2]
-        data = unpack(">%ds" % (length*2), data)[0]
-        self.currentOffset += length * 2
-        return data.decode('utf-16-be')
+        actual_length = length*2
+        data = self.contents[self.currentOffset:self.currentOffset+actual_length]
+        # unpack not needed?!! data = unpack(">%ds" % (actual_length), data)[0]
+        self.currentOffset += actual_length
+        return data.decode('utf_16_be')
     
     def readDate(self):
         global apple_reference_date_offset
@@ -583,8 +585,9 @@ class PlistWriter(object):
             output += obj
         elif isinstance(obj, (str, unicode)):
             if isinstance(obj, unicode):
-                bytes = obj.encode('utf-16be')
-                output += proc_variable_length(0b0110, len(bytes))
+                bytes = obj.encode('utf_16_be')
+                output += proc_variable_length(0b0110, len(bytes)/2)
+                output += bytes
             else:
                 bytes = obj
                 output += proc_variable_length(0b0101, len(bytes))

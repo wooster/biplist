@@ -119,6 +119,13 @@ class TestWritePlist(unittest.TestCase):
     
     def testWriteData(self):
         self.roundTrip(Data("woohoo"))
+        
+    def testUnicode(self):
+        unicodeRoot = u"Mirror's Edge\u2122 for iPad"
+        writePlist(unicodeRoot, "/tmp/odd.plist")
+        self.roundTrip(unicodeRoot)
+        unicodeStrings = [u"Mirror's Edge\u2122 for iPad", u'Weightbot \u2014 Track your Weight in Style']
+        self.roundTrip(unicodeStrings)
 
 if __name__ == '__main__':
     unittest.main()
