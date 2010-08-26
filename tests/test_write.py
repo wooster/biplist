@@ -1,6 +1,8 @@
 from biplist import *
+from biplist import PlistWriter
 import datetime
 import os
+from cStringIO import StringIO
 from test_utils import *
 import unittest
 
@@ -65,6 +67,32 @@ class TestWritePlist(unittest.TestCase):
         try:
             self.roundTrip({Data("hello world"):1})
             self.fail("Data is not a valid key in Cocoa.")
+        except InvalidPlistException, e:
+            pass
+    
+    def testIntBoundaries(self):
+        edges = [0xff, 0xffff, 0xffffffff]
+        for edge in edges:
+            cases = [edge, edge-1, edge+1, edge-2, edge+2, edge*2, edge/2]
+            self.roundTrip(cases)
+        edges = [-pow(2, 7), pow(2, 7) - 1, -pow(2, 15), pow(2, 15) - 1, -pow(2, 31), pow(2, 31) - 1]
+        self.roundTrip(edges)
+        
+        io = StringIO()
+        writer = PlistWriter(io)
+        bytes = [(1, [pow(2, 7) - 1]),
+                 (2, [pow(2, 15) - 1]),
+                 (4, [pow(2, 31) - 1]),
+                 (8, [-pow(2, 7), -pow(2, 15), -pow(2, 31), -pow(2, 63), pow(2, 63) - 1])
+            ]
+        for bytelen, tests in bytes:
+            for test in tests:
+                got = writer.intSize(test)
+                self.assertEquals(bytelen, got, "Byte size is wrong. Expected %d, got %d" % (bytelen, got))
+        
+        try:
+            self.roundTrip([0x8000000000000000, pow(2, 63)])
+            self.fail("2^63 should be too large for Core Foundation to handle.")
         except InvalidPlistException, e:
             pass
     

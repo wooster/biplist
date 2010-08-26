@@ -220,12 +220,7 @@ class PlistReader(object):
         elif bytes == 8:
             result = unpack('>q', data)[0]
         else:
-            #!! This doesn't work?
-            i = 0
-            while i < bytes:
-                self.currentOffset += 1
-                result += (result << 8) + unpack('>B', self.contents[i])[0]
-                i += 1
+            raise InvalidPlistException("Encountered integer longer than 8 bytes.")
         self.currentOffset = original_offset + bytes
         return result
     
@@ -315,13 +310,7 @@ class PlistReader(object):
         elif bytes == 8:
             result = unpack('>q', data)[0]
         else:
-            #!! Doesn't work:
-            i = 0
-            d_read = ''
-            while i < bytes:
-                d_read += bin(unpack('!B', data[i])[0])
-                result += (result << 8) + unpack('!B', data[i])[0]
-                i += 1
+            raise InvalidPlistException("Encountered integer longer than 8 bytes.")
         return result
 
 class HashableWrapper(object):
@@ -608,7 +597,6 @@ class PlistWriter(object):
     def binaryInt(self, obj, bytes=None):
         result = ''
         if bytes is None:
-            #!! compute actual size
             bytes = self.intSize(obj)
         if bytes == 1:
             result += pack('>B', obj)
@@ -619,10 +607,24 @@ class PlistWriter(object):
         elif bytes == 8:
             result += pack('>q', obj)
         else:
-            #!! Uh... what to do here?
-            raise NotImplementedError("Not sure how to do this yet.")
+            raise InvalidPlistException("Core Foundation can't handle integers with size greater than 8 bytes.")
         return result
     
     def intSize(self, obj):
-        #!! Should actually calculate size required.
-        return 8
+        """Returns the number of bytes necessary to store the given integer."""
+        # SIGNED
+        if obj < 0: # Signed integer, always 8 bytes
+            return 8
+        # UNSIGNED
+        elif obj <= 0xFF: # 1 byte
+            return 1
+        elif obj <= 0xFFFF: # 2 bytes
+            return 2
+        elif obj <= 0xFFFFFFFF: # 4 bytes
+            return 4
+        # SIGNED
+        # 0x7FFFFFFFFFFFFFFF is the max.
+        elif obj <= 0x7FFFFFFFFFFFFFFF: # 8 bytes
+            return 8
+        else:
+            raise InvalidPlistException("Core Foundation can't handle integers with size greater than 8 bytes.")
