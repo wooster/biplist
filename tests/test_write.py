@@ -92,6 +92,11 @@ class TestWritePlist(unittest.TestCase):
             self.fail("Data is not a valid key in Cocoa.")
         except InvalidPlistException, e:
             pass
+        try:
+            self.roundTrip({1:1})
+            self.fail("Number is not a valid key in Cocoa.")
+        except InvalidPlistException, e:
+            pass
     
     def testIntBoundaries(self):
         edges = [0xff, 0xffff, 0xffffffff]
