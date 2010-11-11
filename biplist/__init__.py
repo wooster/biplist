@@ -552,6 +552,10 @@ class PlistWriter(object):
                 result += pack('!B', (format << 4) | length)
             return result
         
+        if isinstance(obj, unicode) and obj == u'':
+            # The Apple Plist decoder can't decode a zero length Unicode string.
+            obj = ''
+        
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
         

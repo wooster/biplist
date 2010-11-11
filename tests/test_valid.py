@@ -31,6 +31,10 @@ class TestValidPlistFile(unittest.TestCase):
     def testUnicodeRoot(self):
         result = readPlist(data_path('unicode_root.plist'))
         self.assertEquals(result, u"Mirror's Edge\u2122 for iPad")
+    
+    def testEmptyUnicodeRoot(self):
+        result = readPlist(data_path('unicode_empty.plist'))
+        self.assertEquals(result, u"")
         
 if __name__ == '__main__':
     unittest.main()

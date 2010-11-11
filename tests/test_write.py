@@ -57,6 +57,8 @@ class TestWritePlist(unittest.TestCase):
     
     def testString(self):
         self.roundTrip('0')
+        self.roundTrip('')
+        self.roundTrip({'a':''})
     
     def testLargeDict(self):
         d = {}
@@ -126,6 +128,8 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(unicodeRoot)
         unicodeStrings = [u"Mirror's Edge\u2122 for iPad", u'Weightbot \u2014 Track your Weight in Style']
         self.roundTrip(unicodeStrings)
+        self.roundTrip({u"":u""})
+        self.roundTrip(u"")
 
 if __name__ == '__main__':
     unittest.main()
