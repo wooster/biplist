@@ -30,7 +30,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Text Processing :: Markup",
     ],    
-    setup_requires = ['nose'],
+    setup_requires = ['nose', 'coverage'],
     test_suite = 'nose.collector',
     install_requires = [
     ],
