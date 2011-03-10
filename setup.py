@@ -11,18 +11,26 @@ import os
 
 setup(
     name = 'biplist',
-    version = '0.1',
+    version = '0.2',
     url = 'https://github.com/wooster/biplist',
     download_url = 'https://github.com/wooster/biplist/downloads',
     license = 'BSD',
     description = "biplist is a library for reading/writing binary plists.",
+    long_description = 
+    """`biplist` is a binary plist parser/generator for Python.
+
+Binary Property List (plist) files provide a faster and smaller serialization
+format for property lists on OS X. This is a library for generating binary
+plists which can be read by OS X, iOS, or other clients.
+
+This module requires Python 2.6 or higher.""",
     author = 'Andrew Wooster',
     author_email = 'andrew@planetaryscale.com',
     packages = find_packages(),
     include_package_data = True,
     zip_safe = False,
     classifiers = [
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
