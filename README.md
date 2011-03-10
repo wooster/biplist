@@ -25,6 +25,12 @@ The exceptions `InvalidPlistException` and `NotBinaryPlistException` may be
 thrown to indicate that the data cannot be serialized or deserialized as
 a binary plist.
 
+## Installation
+
+To install the latest release version:
+
+`sudo easy_install biplist`
+
 ## Examples
 
 Plist generation example:
