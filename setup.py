@@ -13,7 +13,7 @@ setup(
     name = 'biplist',
     version = '0.2',
     url = 'https://github.com/wooster/biplist',
-    download_url = 'https://github.com/wooster/biplist/downloads',
+    download_url = 'https://github.com/wooster/biplist/downloads/biplist-0.2.tar.gz',
     license = 'BSD',
     description = "biplist is a library for reading/writing binary plists.",
     long_description = 
