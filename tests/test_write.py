@@ -31,6 +31,10 @@ class TestWritePlist(unittest.TestCase):
     
     def testBoolRoot(self):
         self.roundTrip(True)
+    
+    def testDuplicate(self):
+        l = ["foo" for i in xrange(0, 100)]
+        self.roundTrip(l)
         
     def testListRoot(self):
         self.roundTrip([1, 2, 3])
@@ -45,10 +49,11 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip({'aFloat':1.23})
     
     def testTuple(self):
-        result = writePlistToString({'aTuple':(1, 2.0, 'a')})
+        result = writePlistToString({'aTuple':(1, 2.0, 'a'), 'dupTuple':('a', 'a', 'a', 'b', 'b')})
         self.assertTrue(len(result) > 0)
         readResult = readPlistFromString(result)
         self.assertEquals(readResult['aTuple'], [1, 2.0, 'a'])
+        self.assertEquals(readResult['dupTuple'], ['a', 'a', 'a', 'b', 'b'])
     
     def testComplicated(self):
         root = {'preference':[1, 2, {'hi there':['a', 1, 2, {'yarrrr':123}]}]}

@@ -610,7 +610,7 @@ class PlistWriter(object):
                     (isNew, output) = self.writeObjectReference(objRef, output)
                     if isNew:
                         objectsToWrite.append(objRef)
-                for objRef in obj:
+                for objRef in objectsToWrite:
                     output = self.writeObject(objRef, output, setReferencePosition=True)
             elif isinstance(obj, dict):
                 output += proc_variable_length(0b1101, len(obj))
