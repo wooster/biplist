@@ -140,6 +140,16 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(unicodeStrings)
         self.roundTrip({u"":u""})
         self.roundTrip(u"")
+        
+    def testUidWrite(self):
+        self.roundTrip({'$version': 100000, 
+            '$objects': 
+                ['$null', 
+                 {'$class': Uid(3), 'somekey': Uid(2)}, 
+                 'object value as string', 
+                 {'$classes': ['Archived', 'NSObject'], '$classname': 'Archived'}
+                 ], 
+            '$top': {'root': Uid(1)}, '$archiver': 'NSKeyedArchiver'})
 
 if __name__ == '__main__':
     unittest.main()

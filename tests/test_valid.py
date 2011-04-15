@@ -35,6 +35,30 @@ class TestValidPlistFile(unittest.TestCase):
     def testEmptyUnicodeRoot(self):
         result = readPlist(data_path('unicode_empty.plist'))
         self.assertEquals(result, u"")
+    
+    def testKeyedArchiverPlist(self):
+        """
+        Archive is created with class like this:
+        @implementation Archived
+        ...
+        - (void)encodeWithCoder:(NSCoder *)coder {
+            [coder encodeObject:@"object value as string" forKey:@"somekey"];
+        }
+        @end
+        
+        Archived *test = [[Archived alloc] init];
+        NSData *data = [NSKeyedArchiver archivedDataWithRootObject:test]
+        ...
+        """
+        result = readPlist(data_path('nskeyedarchiver_example.plist'))
+        self.assertEquals(result, {'$version': 100000, 
+            '$objects': 
+                ['$null', 
+                 {'$class': Uid(3), 'somekey': Uid(2)}, 
+                 'object value as string', 
+                 {'$classes': ['Archived', 'NSObject'], '$classname': 'Archived'}
+                 ], 
+            '$top': {'root': Uid(1)}, '$archiver': 'NSKeyedArchiver'})
         
 if __name__ == '__main__':
     unittest.main()

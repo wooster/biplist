@@ -61,8 +61,10 @@ __all__ = [
 apple_reference_date_offset = 978307200
 
 class Uid(int):
-    """Wrapper around integers for representing UID values."""
-    pass
+    """Wrapper around integers for representing UID values. This
+       is used in keyed archiving."""
+    def __repr__(self):
+        return "Uid(%d)" % self
 
 class Data(str):
     """Wrapper around str types for representing Data values."""
@@ -570,7 +572,7 @@ class PlistWriter(object):
         elif isinstance(obj, Uid):
             size = self.intSize(obj)
             output += pack('!B', (0b1000 << 4) | size - 1)
-            output += self.binaryInt(Uid)
+            output += self.binaryInt(obj)
         elif isinstance(obj, (int, long)):
             bytes = self.intSize(obj)
             root = math.log(bytes, 2)

@@ -6,7 +6,7 @@ import unittest
 class TestInvalidPlistFile(unittest.TestCase):
     def setUp(self):
         pass
-    def test_empty_file(self):
+    def testEmptyFile(self):
         try:
             readPlist(data_path('empty_file.plist'))
             self.fail("Should not successfully read empty plist.")
