@@ -12,8 +12,8 @@ class TestWritePlist(unittest.TestCase):
     def setUp(self):
         pass
     
-    def roundTrip(self, root):
-        plist = writePlistToString(root)
+    def roundTrip(self, root, xml=False):
+        plist = writePlistToString(root, binary=(not xml))
         self.assertTrue(len(plist) > 0)
         readResult = readPlistFromString(plist)
         self.assertEquals(readResult, root)
@@ -28,6 +28,9 @@ class TestWritePlist(unittest.TestCase):
             (status, output) = run_command(['/usr/bin/plutil', '-lint', name])
             if status != 0:
                 self.fail("plutil verification failed (status %d): %s" % (status, output))
+    
+    def testXMLPlist(self):
+        self.roundTrip({'hello':'world'}, xml=True)
     
     def testBoolRoot(self):
         self.roundTrip(True)
@@ -70,16 +73,20 @@ class TestWritePlist(unittest.TestCase):
         for i in xrange(0, 1000):
             d['%d' % i] = '%d' % i
         self.roundTrip(d)
+        
+    def testBools(self):
+        self.roundTrip([True, False])
     
     def testUniques(self):
         root = {'hi':'there', 'halloo':'there'}
         self.roundTrip(root)
     
     def testWriteToFile(self):
-        path = '/var/tmp/test.plist'
-        writePlist([1, 2, 3], path)
-        self.assertTrue(os.path.exists(path))
-        self.lintPlist(open(path).read())
+        for is_binary in [True, False]:
+            path = '/var/tmp/test.plist'
+            writePlist([1, 2, 3], path, binary=is_binary)
+            self.assertTrue(os.path.exists(path))
+            self.lintPlist(open(path).read())
     
     def testNone(self):
         self.roundTrip(None)
@@ -90,17 +97,17 @@ class TestWritePlist(unittest.TestCase):
         try:
             self.roundTrip({None:1})
             self.fail("None is not a valid key in Cocoa.")
-        except InvalidPlistException, e:
+        except InvalidPlistException as e:
             pass
         try:
             self.roundTrip({Data("hello world"):1})
             self.fail("Data is not a valid key in Cocoa.")
-        except InvalidPlistException, e:
+        except InvalidPlistException as e:
             pass
         try:
             self.roundTrip({1:1})
             self.fail("Number is not a valid key in Cocoa.")
-        except InvalidPlistException, e:
+        except InvalidPlistException as e:
             pass
     
     def testIntBoundaries(self):
@@ -126,7 +133,7 @@ class TestWritePlist(unittest.TestCase):
         try:
             self.roundTrip([0x8000000000000000, pow(2, 63)])
             self.fail("2^63 should be too large for Core Foundation to handle.")
-        except InvalidPlistException, e:
+        except InvalidPlistException as e:
             pass
     
     def testWriteData(self):

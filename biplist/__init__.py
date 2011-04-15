@@ -90,6 +90,7 @@ def readPlist(pathOrFile):
         result = reader.parse()
     except NotBinaryPlistException, e:
         try:
+            pathOrFile.seek(0)
             result = plistlib.readPlist(pathOrFile)
         except Exception, e:
             raise InvalidPlistException(e)

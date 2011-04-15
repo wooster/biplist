@@ -23,9 +23,9 @@ class TestValidPlistFile(unittest.TestCase):
         try:
             result = readPlist(data_path('simple_binary.plist'))
             self.validateSimpleBinaryRoot(result)
-        except NotBinaryPlistException, e:
+        except NotBinaryPlistException as e:
             self.fail("NotBinaryPlistException: %s" % e)
-        except InvalidPlistException, e:
+        except InvalidPlistException as e:
             self.fail("InvalidPlistException: %s" % e)
     
     def testUnicodeRoot(self):
@@ -59,6 +59,7 @@ class TestValidPlistFile(unittest.TestCase):
                  {'$classes': ['Archived', 'NSObject'], '$classname': 'Archived'}
                  ], 
             '$top': {'root': Uid(1)}, '$archiver': 'NSKeyedArchiver'})
-        
+        self.assertEquals("Uid(1)", repr(Uid(1)))
+    
 if __name__ == '__main__':
     unittest.main()
