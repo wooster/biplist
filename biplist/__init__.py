@@ -387,16 +387,14 @@ class PlistWriter(object):
         # A set of all the uniques which have been computed.
         self.computedUniques = set()
         # A list of all the uniques which have been written.
-        self.writtenReferences = []
+        self.writtenReferences = {}
         # A dict of the positions of the written uniques.
         self.referencePositions = {}
         
     def positionOfObjectReference(self, obj):
         """If the given object has been written already, return its
            position in the offset table. Otherwise, return None."""
-        if obj in self.writtenReferences:
-            return self.writtenReferences.index(obj)
-        return None
+        return self.writtenReferences.get(obj)
         
     def writeRoot(self, root):
         """
@@ -534,7 +532,7 @@ class PlistWriter(object):
         """
         position = self.positionOfObjectReference(obj)
         if position is None:
-            self.writtenReferences.append(obj)
+            self.writtenReferences[obj] = len(self.writtenReferences)
             output += self.binaryInt(len(self.writtenReferences) - 1, bytes=self.trailer.objectRefSize)
             return (True, output)
         else:
@@ -637,9 +635,11 @@ class PlistWriter(object):
     def writeOffsetTable(self, output):
         """Writes all of the object reference offsets."""
         all_positions = []
-        for obj in self.writtenReferences:
-            position = self.referencePositions.get(obj, None)
-            if position == None:
+        writtenReferences = self.writtenReferences.items()
+        writtenReferences.sort(lambda x,y: cmp(x[1], y[1]))
+        for obj,order in writtenReferences:
+            position = self.referencePositions.get(obj)
+            if position is None:
                 raise InvalidPlistException("Error while writing offsets table. Object not found. %s" % obj)
             output += self.binaryInt(position, self.trailer.offsetSize)
             all_positions.append(position)
