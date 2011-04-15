@@ -46,6 +46,7 @@ Plist parsing example:
 
 from collections import namedtuple
 from cStringIO import StringIO
+import calendar
 import datetime
 import math
 import plistlib
@@ -584,7 +585,7 @@ class PlistWriter(object):
             output += pack('!B', (0b0010 << 4) | 3)
             output += self.binaryReal(obj)
         elif isinstance(obj, datetime.datetime):
-            timestamp = time.mktime(obj.timetuple())
+            timestamp = calendar.timegm(obj.utctimetuple())
             timestamp -= apple_reference_date_offset
             output += pack('!B', 0b00110011)
             output += pack('!d', float(timestamp))

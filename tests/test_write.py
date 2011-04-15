@@ -48,6 +48,11 @@ class TestWritePlist(unittest.TestCase):
     def testSetRoot(self):
         self.roundTrip(set((1, 2, 3)))
     
+    def testDatetime(self):
+        now = datetime.datetime.utcnow()
+        now = now.replace(microsecond=0)
+        self.roundTrip([now])
+    
     def testFloat(self):
         self.roundTrip({'aFloat':1.23})
     
