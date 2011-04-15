@@ -261,17 +261,7 @@ class PlistReader(object):
         result = 0
         original_offset = self.currentOffset
         data = self.contents[self.currentOffset:self.currentOffset+bytes]
-        # 1, 2, and 4 byte integers are unsigned
-        if bytes == 1:
-            result = unpack('>B', data)[0]
-        elif bytes == 2:
-            result = unpack('>H', data)[0]
-        elif bytes == 4:
-            result = unpack('>L', data)[0]
-        elif bytes == 8:
-            result = unpack('>q', data)[0]
-        else:
-            raise InvalidPlistException("Encountered integer longer than 8 bytes.")
+        result = self.getSizedInteger(data, bytes)
         self.currentOffset = original_offset + bytes
         return result
     

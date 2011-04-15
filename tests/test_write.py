@@ -135,6 +135,9 @@ class TestWritePlist(unittest.TestCase):
                 got = writer.intSize(test)
                 self.assertEquals(bytelen, got, "Byte size is wrong. Expected %d, got %d" % (bytelen, got))
         
+        bytes_lists = [list(x) for x in bytes]
+        self.roundTrip(bytes_lists)
+        
         try:
             self.roundTrip([0x8000000000000000, pow(2, 63)])
             self.fail("2^63 should be too large for Core Foundation to handle.")

@@ -19,7 +19,7 @@ class TestValidPlistFile(unittest.TestCase):
         self.assertEquals(root['boolItem'], True)
         self.assertEquals(root['arrayItem'], ['item0'])
         
-    def test_file_read(self):
+    def testFileRead(self):
         try:
             result = readPlist(data_path('simple_binary.plist'))
             self.validateSimpleBinaryRoot(result)
@@ -35,6 +35,10 @@ class TestValidPlistFile(unittest.TestCase):
     def testEmptyUnicodeRoot(self):
         result = readPlist(data_path('unicode_empty.plist'))
         self.assertEquals(result, u"")
+    
+    def testSmallReal(self):
+        result = readPlist(data_path('small_real.plist'))
+        self.assertEquals(result, {'4 byte real':0.5})
     
     def testKeyedArchiverPlist(self):
         """
