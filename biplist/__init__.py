@@ -359,7 +359,13 @@ class HashableWrapper(object):
     def __init__(self, value):
         self.value = value
     def __repr__(self):
-        return "<HashableWrapper: %s>" % self.value
+        return "<HashableWrapper: %s>" % [self.value]
+
+class BoolWrapper(object):
+    def __init__(self, value):
+        self.value = value
+    def __repr__(self):
+        return "<BoolWrapper: %s>" % self.value
 
 class PlistWriter(object):
     header = 'bplist00bybiplist1.0'
@@ -369,10 +375,14 @@ class PlistWriter(object):
     computedUniques = None
     writtenReferences = None
     referencePositions = None
+    wrappedTrue = None
+    wrappedFalse = None
     
     def __init__(self, file):
         self.reset()
         self.file = file
+        self.wrappedTrue = BoolWrapper(True)
+        self.wrappedFalse = BoolWrapper(False)
 
     def reset(self):
         self.byteCounts = PlistByteCounts(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -428,7 +438,12 @@ class PlistWriter(object):
         self.file.write(output)
     
     def wrapRoot(self, root):
-        if isinstance(root, set):
+        if isinstance(root, bool):
+            if root is True:
+                return self.wrappedTrue
+            else:
+                return self.wrappedFalse
+        elif isinstance(root, set):
             n = set()
             for value in root:
                 n.add(self.wrapRoot(value))
@@ -475,7 +490,7 @@ class PlistWriter(object):
         
         if obj is None:
             self.incrementByteCount('nullBytes')
-        elif type(obj) == bool:
+        elif isinstance(obj, BoolWrapper):
             self.incrementByteCount('boolBytes')
         elif isinstance(obj, Uid):
             size = self.intSize(obj)
@@ -556,8 +571,8 @@ class PlistWriter(object):
         
         if obj is None:
             output += pack('!B', 0b00000000)
-        elif type(obj) == bool:
-            if obj is False:
+        elif isinstance(obj, BoolWrapper):
+            if obj.value is False:
                 output += pack('!B', 0b00001000)
             else:
                 output += pack('!B', 0b00001001)

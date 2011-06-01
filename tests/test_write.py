@@ -34,6 +34,7 @@ class TestWritePlist(unittest.TestCase):
     
     def testBoolRoot(self):
         self.roundTrip(True)
+        self.roundTrip(False)
     
     def testDuplicate(self):
         l = ["foo" for i in xrange(0, 100)]
@@ -44,6 +45,22 @@ class TestWritePlist(unittest.TestCase):
     
     def testDictRoot(self):
         self.roundTrip({'a':1, 'B':'d'})
+    
+    def boolsAndIntegersHelper(self, cases):
+        result = readPlistFromString(writePlistToString(cases))
+        for i in range(0, len(cases)):
+            self.assertTrue(cases[i] == result[i])
+            self.assertEquals(type(cases[i]), type(result[i]), "Type mismatch on %d: %s != %s" % (i, repr(cases[i]), repr(result[i])))
+    
+    def reprChecker(self, case):
+        result = readPlistFromString(writePlistToString(case))
+        self.assertEquals(repr(case), repr(result))
+    
+    def testBoolsAndIntegersMixed(self):
+        self.boolsAndIntegersHelper([0, 1, True, False, None])
+        self.boolsAndIntegersHelper([False, True, 0, 1, None])
+        self.reprChecker({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
+        self.reprChecker([1, 1, 1, 1, 1, True, True, True, True])
     
     def testSetRoot(self):
         self.roundTrip(set((1, 2, 3)))
