@@ -34,25 +34,29 @@ To install the latest release version:
 ## Examples
 
 Plist generation example:
-    
-    from biplist import *
-    from datetime import datetime
-    plist = {'aKey':'aValue',
-             '0':1.322,
-             'now':datetime.now(),
-             'list':[1,2,3],
-             'tuple':('a','b','c')
-             }
-    try:
-        writePlist(plist, "example.plist")
-    except (InvalidPlistException, NotBinaryPlistException), e:
-        print "Something bad happened:", e
+
+```python
+from biplist import *
+from datetime import datetime
+plist = {'aKey':'aValue',
+         '0':1.322,
+         'now':datetime.now(),
+         'list':[1,2,3],
+         'tuple':('a','b','c')
+         }
+try:
+    writePlist(plist, "example.plist")
+except (InvalidPlistException, NotBinaryPlistException), e:
+    print "Something bad happened:", e
+```
 
 Plist parsing example:
 
-    from biplist import *
-    try:
-        plist = readPlist("example.plist")
-        print plist
-    except (InvalidPlistException, NotBinaryPlistException), e:
-        print "Not a plist:", e
+```python
+from biplist import *
+try:
+    plist = readPlist("example.plist")
+    print plist
+except (InvalidPlistException, NotBinaryPlistException), e:
+    print "Not a plist:", e
+```
