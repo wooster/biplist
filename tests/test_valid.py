@@ -3,6 +3,7 @@ import datetime
 import os
 from test_utils import *
 import unittest
+import six
 
 class TestValidPlistFile(unittest.TestCase):
     def setUp(self):
@@ -12,8 +13,8 @@ class TestValidPlistFile(unittest.TestCase):
         self.assertTrue(type(root) == dict, "Root should be dictionary.")
         self.assertTrue(type(root['dateItem']) == datetime.datetime, "date should be datetime")
         self.assertEquals(root['dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
-        self.assertEquals(root['numberItem'], -10000000000000000L, "number not of expected value")
-        self.assertEquals(root['unicodeItem'], u'abc\u212cdef\u2133')
+        self.assertEquals(root['numberItem'], -10000000000000000, "number not of expected value")
+        self.assertEquals(root['unicodeItem'], six.u('abc\u212cdef\u2133'))
         self.assertEquals(root['stringItem'], 'Hi there')
         self.assertEquals(root['realItem'], 0.47)
         self.assertEquals(root['boolItem'], True)
@@ -30,11 +31,11 @@ class TestValidPlistFile(unittest.TestCase):
     
     def testUnicodeRoot(self):
         result = readPlist(data_path('unicode_root.plist'))
-        self.assertEquals(result, u"Mirror's Edge\u2122 for iPad")
+        self.assertEquals(result, six.u("Mirror's Edge\u2122 for iPad"))
     
     def testEmptyUnicodeRoot(self):
         result = readPlist(data_path('unicode_empty.plist'))
-        self.assertEquals(result, u"")
+        self.assertEquals(result, six.u(""))
     
     def testSmallReal(self):
         result = readPlist(data_path('small_real.plist'))

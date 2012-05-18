@@ -2,11 +2,13 @@ from biplist import *
 from biplist import PlistWriter
 import datetime
 import os
-from cStringIO import StringIO
+#from cStringIO import StringIO
 import subprocess
 import tempfile
 from test_utils import *
 import unittest
+import six
+from six import BytesIO as StringIO
 
 class TestWritePlist(unittest.TestCase):
     def setUp(self):
@@ -37,7 +39,7 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(False)
     
     def testDuplicate(self):
-        l = ["foo" for i in xrange(0, 100)]
+        l = ["foo" for i in range(0, 100)]
         self.roundTrip(l)
         
     def testListRoot(self):
@@ -92,7 +94,7 @@ class TestWritePlist(unittest.TestCase):
     
     def testLargeDict(self):
         d = {}
-        for i in xrange(0, 1000):
+        for i in range(0, 1000):
             d['%d' % i] = '%d' % i
         self.roundTrip(d)
         
@@ -108,7 +110,7 @@ class TestWritePlist(unittest.TestCase):
             path = '/var/tmp/test.plist'
             writePlist([1, 2, 3], path, binary=is_binary)
             self.assertTrue(os.path.exists(path))
-            self.lintPlist(open(path).read())
+            self.lintPlist(open(path, 'rb').read())
     
     def testNone(self):
         self.roundTrip(None)
@@ -122,7 +124,7 @@ class TestWritePlist(unittest.TestCase):
         except InvalidPlistException as e:
             pass
         try:
-            self.roundTrip({Data("hello world"):1})
+            self.roundTrip({Data(six.b("hello world")):1})
             self.fail("Data is not a valid key in Cocoa.")
         except InvalidPlistException as e:
             pass
@@ -162,16 +164,16 @@ class TestWritePlist(unittest.TestCase):
             pass
     
     def testWriteData(self):
-        self.roundTrip(Data("woohoo"))
+        self.roundTrip(Data(six.b("woohoo")))
         
     def testUnicode(self):
-        unicodeRoot = u"Mirror's Edge\u2122 for iPad"
+        unicodeRoot = six.u("Mirror's Edge\u2122 for iPad")
         writePlist(unicodeRoot, "/tmp/odd.plist")
         self.roundTrip(unicodeRoot)
-        unicodeStrings = [u"Mirror's Edge\u2122 for iPad", u'Weightbot \u2014 Track your Weight in Style']
+        unicodeStrings = [six.u("Mirror's Edge\u2122 for iPad"), six.u('Weightbot \u2014 Track your Weight in Style')]
         self.roundTrip(unicodeStrings)
-        self.roundTrip({u"":u""})
-        self.roundTrip(u"")
+        self.roundTrip({six.u(""):six.u("")})
+        self.roundTrip(six.u(""))
         
     def testUidWrite(self):
         self.roundTrip({'$version': 100000, 
