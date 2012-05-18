@@ -56,6 +56,18 @@ from struct import pack, unpack
 import sys
 import time
 
+from functools import wraps
+def returns(type_):
+    def wrap(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            val = fn(*args, **kwargs)
+            if not isinstance(val, type_):
+                import pdb; pdb.set_trace()
+            return val
+        return wrapped
+    return wrap
+
 __all__ = [
     'Uid', 'Data', 'readPlist', 'writePlist', 'readPlistFromString',
     'writePlistToString', 'InvalidPlistException', 'NotBinaryPlistException'
@@ -85,7 +97,7 @@ def readPlist(pathOrFile):
     """Raises NotBinaryPlistException, InvalidPlistException"""
     didOpen = False
     result = None
-    if isinstance(pathOrFile, six.string_types):
+    if isinstance(pathOrFile, (six.binary_type, six.text_type)):
         pathOrFile = open(pathOrFile, 'rb')
         didOpen = True
     try:
@@ -106,7 +118,7 @@ def writePlist(rootObject, pathOrFile, binary=True):
         return plistlib.writePlist(rootObject, pathOrFile)
     else:
         didOpen = False
-        if isinstance(pathOrFile, six.string_types):
+        if isinstance(pathOrFile, (six.binary_type, six.text_type)):
             pathOrFile = open(pathOrFile, 'wb')
             didOpen = True
         writer = PlistWriter(pathOrFile)
@@ -428,7 +440,7 @@ class PlistWriter(object):
         self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(len(self.computedUniques))})
         (_, output) = self.writeObjectReference(wrapped_root, output)
         output = self.writeObject(wrapped_root, output, setReferencePosition=True)
-        
+
         # output size at this point is an upper bound on how big the
         # object reference offsets need to be.
         self.trailer = self.trailer._replace(**{
@@ -437,11 +449,12 @@ class PlistWriter(object):
             'offsetTableOffset':len(output),
             'topLevelObjectNumber':0
             })
-        
+
         output = self.writeOffsetTable(output)
         output += pack('!xxxxxxBBQQQ', *self.trailer)
         self.file.write(output)
-    
+
+#    @returns((six.binary_type, HashableWrapper))
     def wrapRoot(self, root):
         if isinstance(root, bool):
             if root is True:
@@ -478,7 +491,7 @@ class PlistWriter(object):
                 raise InvalidPlistException('Dictionary keys cannot be null in plists.')
             elif isinstance(key, Data):
                 raise InvalidPlistException('Data cannot be dictionary keys in plists.')
-            elif not isinstance(key, six.string_types):
+            elif not isinstance(key, (six.binary_type, six.text_type)):
                 raise InvalidPlistException('Keys must be strings.')
         
         def proc_size(size):
@@ -511,7 +524,7 @@ class PlistWriter(object):
         elif isinstance(obj, Data):
             size = proc_size(len(obj))
             self.incrementByteCount('dataBytes', incr=1+size)
-        elif isinstance(obj, six.string_types):
+        elif isinstance(obj, (six.text_type, six.binary_type)):
             size = proc_size(len(obj))
             self.incrementByteCount('stringBytes', incr=1+size)
         elif isinstance(obj, HashableWrapper):
@@ -569,9 +582,8 @@ class PlistWriter(object):
         
         if isinstance(obj, six.text_type) and obj == six.u(''):
             # The Apple Plist decoder can't decode a zero length Unicode string.
-            import pdb; pdb.set_trace()
-            obj = ''
-        
+            obj = six.b('')
+       
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
         
@@ -603,15 +615,14 @@ class PlistWriter(object):
         elif isinstance(obj, Data):
             output += proc_variable_length(0b0100, len(obj))
             output += obj
-        elif isinstance(obj, six.string_types):
-            if isinstance(obj, six.text_type):
-                bytes = obj.encode('utf_16_be')
-                output += proc_variable_length(0b0110, len(bytes)//2)
-                output += bytes
-            else:
-                bytes = obj
-                output += proc_variable_length(0b0101, len(bytes))
-                output += bytes
+        elif isinstance(obj, six.text_type):
+            bytes = obj.encode('utf_16_be')
+            output += proc_variable_length(0b0110, len(bytes)//2)
+            output += bytes
+        elif isinstance(obj, six.binary_type):
+            bytes = obj
+            output += proc_variable_length(0b0101, len(bytes))
+            output += bytes
         elif isinstance(obj, HashableWrapper):
             obj = obj.value
             if isinstance(obj, (set, list, tuple)):

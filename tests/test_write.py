@@ -87,9 +87,9 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(root)
     
     def testString(self):
-        self.roundTrip('0')
-        self.roundTrip('')
-        self.roundTrip({'a':''})
+        self.roundTrip(six.b('0'))
+        self.roundTrip(six.b(''))
+        self.roundTrip({six.b('a'):six.b('')})
     
     def testLargeDict(self):
         d = {}
