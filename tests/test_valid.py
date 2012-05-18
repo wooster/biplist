@@ -34,12 +34,19 @@ class TestValidPlistFile(unittest.TestCase):
         self.assertEquals(result, six.u("Mirror's Edge\u2122 for iPad"))
     
     def testEmptyUnicodeRoot(self):
+        # Porting note: this test was tricky; it was only passing in
+        # Python 2 because the empty byte-string returned by
+        # readPlist() is considered equal to the empty unicode-string
+        # in the assertion.  Confusingly enough, given the name of the
+        # test, the value in unicode_empty.plist has the format byte
+        # 0b0101 (ASCII string), so the value being asserted against
+        # appears to be what is wrong.
         result = readPlist(data_path('unicode_empty.plist'))
-        self.assertEquals(result, six.u(""))
+        self.assertEquals(result, six.b(""))
     
     def testSmallReal(self):
         result = readPlist(data_path('small_real.plist'))
-        self.assertEquals(result, {'4 byte real':0.5})
+        self.assertEquals(result, {six.b('4 byte real'):0.5})
     
     def testKeyedArchiverPlist(self):
         """

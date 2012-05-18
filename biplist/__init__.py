@@ -48,7 +48,6 @@ import sys
 import six
 
 from collections import namedtuple
-from six import BytesIO as StringIO
 import calendar
 import datetime
 import math
@@ -87,7 +86,7 @@ def readPlist(pathOrFile):
     didOpen = False
     result = None
     if isinstance(pathOrFile, six.string_types):
-        pathOrFile = open(pathOrFile)
+        pathOrFile = open(pathOrFile, 'rb')
         didOpen = True
     try:
         reader = PlistReader(pathOrFile)
@@ -117,7 +116,7 @@ def writePlist(rootObject, pathOrFile, binary=True):
         return result
 
 def readPlistFromString(data):
-    return readPlist(StringIO(data))
+    return readPlist(six.BytesIO(data))
 
 def writePlistToString(rootObject, binary=True):
     if not binary:
@@ -126,7 +125,7 @@ def writePlistToString(rootObject, binary=True):
         else:
             return plistlib.writePlistToString(rootObject)
     else:
-        io = StringIO()
+        io = six.BytesIO()
         writer = PlistWriter(io)
         writer.writeRoot(rootObject)
         return io.getvalue()
@@ -570,6 +569,7 @@ class PlistWriter(object):
         
         if isinstance(obj, six.text_type) and obj == six.u(''):
             # The Apple Plist decoder can't decode a zero length Unicode string.
+            import pdb; pdb.set_trace()
             obj = ''
         
         if setReferencePosition:

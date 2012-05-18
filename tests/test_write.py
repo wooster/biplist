@@ -8,7 +8,6 @@ import tempfile
 from test_utils import *
 import unittest
 import six
-from six import BytesIO as StringIO
 
 class TestWritePlist(unittest.TestCase):
     def setUp(self):
@@ -142,7 +141,7 @@ class TestWritePlist(unittest.TestCase):
         edges = [-pow(2, 7), pow(2, 7) - 1, -pow(2, 15), pow(2, 15) - 1, -pow(2, 31), pow(2, 31) - 1]
         self.roundTrip(edges)
         
-        io = StringIO()
+        io = six.BytesIO()
         writer = PlistWriter(io)
         bytes = [(1, [pow(2, 7) - 1]),
                  (2, [pow(2, 15) - 1]),
