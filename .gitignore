@@ -11,5 +11,8 @@ Icon*
 # Emacs noise
 *~
 
+# tox noise
+*.egg
+
 # other noise
 .svn
