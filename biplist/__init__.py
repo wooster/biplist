@@ -84,7 +84,7 @@ def readPlist(pathOrFile):
     didOpen = False
     result = None
     if isinstance(pathOrFile, (str, unicode)):
-        pathOrFile = open(pathOrFile)
+        pathOrFile = open(pathOrFile, 'rb')
         didOpen = True
     try:
         reader = PlistReader(pathOrFile)
@@ -105,7 +105,7 @@ def writePlist(rootObject, pathOrFile, binary=True):
     else:
         didOpen = False
         if isinstance(pathOrFile, (str, unicode)):
-            pathOrFile = open(pathOrFile, 'w')
+            pathOrFile = open(pathOrFile, 'wb')
             didOpen = True
         writer = PlistWriter(pathOrFile)
         result = writer.writeRoot(rootObject)
