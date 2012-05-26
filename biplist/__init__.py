@@ -45,8 +45,6 @@ Plist parsing example:
 """
 
 import sys
-import six
-
 from collections import namedtuple
 import calendar
 import datetime
@@ -56,17 +54,7 @@ from struct import pack, unpack
 import sys
 import time
 
-from functools import wraps
-def returns(type_):
-    def wrap(fn):
-        @wraps(fn)
-        def wrapped(*args, **kwargs):
-            val = fn(*args, **kwargs)
-            if not isinstance(val, type_):
-                import pdb; pdb.set_trace()
-            return val
-        return wrapped
-    return wrap
+import six
 
 __all__ = [
     'Uid', 'Data', 'readPlist', 'writePlist', 'readPlistFromString',
@@ -440,7 +428,7 @@ class PlistWriter(object):
         self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(len(self.computedUniques))})
         (_, output) = self.writeObjectReference(wrapped_root, output)
         output = self.writeObject(wrapped_root, output, setReferencePosition=True)
-
+        
         # output size at this point is an upper bound on how big the
         # object reference offsets need to be.
         self.trailer = self.trailer._replace(**{
@@ -449,12 +437,11 @@ class PlistWriter(object):
             'offsetTableOffset':len(output),
             'topLevelObjectNumber':0
             })
-
+        
         output = self.writeOffsetTable(output)
         output += pack('!xxxxxxBBQQQ', *self.trailer)
         self.file.write(output)
 
-#    @returns((six.binary_type, HashableWrapper))
     def wrapRoot(self, root):
         if isinstance(root, bool):
             if root is True:
@@ -663,7 +650,6 @@ class PlistWriter(object):
         all_positions = []
         writtenReferences = list(self.writtenReferences.items())
         writtenReferences.sort(key=lambda x: x[1])
-#        writtenReferences.sort(lambda x,y: cmp(x[1], y[1]))
         for obj,order in writtenReferences:
             # Porting note: Elsewhere we deliberately replace empty unicdoe strings
             # with empty binary strings, but the empty unicode string
