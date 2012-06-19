@@ -93,14 +93,32 @@ def readPlist(pathOrFile):
         try:
             pathOrFile.seek(0)
             result = plistlib.readPlist(pathOrFile)
+            result = wrapDataObject(result, for_binary=True)
         except Exception, e:
             raise InvalidPlistException(e)
     if didOpen:
         pathOrFile.close()
     return result
 
+def wrapDataObject(o, for_binary=False):
+    if isinstance(o, Data) and not for_binary:
+        o = plistlib.Data(o)
+    elif isinstance(o, plistlib.Data) and for_binary:
+        o = Data(o.data)
+    elif isinstance(o, tuple):
+        o = wrapDataObject(list(o), for_binary)
+        o = tuple(o)
+    elif isinstance(o, list):
+        for i in xrange(len(o)):
+            o[i] = wrapDataObject(o[i], for_binary)
+    elif isinstance(o, dict):
+        for k in o:
+            o[k] = wrapDataObject(o[k], for_binary)
+    return o
+
 def writePlist(rootObject, pathOrFile, binary=True):
     if not binary:
+        rootObject = wrapDataObject(rootObject, binary)
         return plistlib.writePlist(rootObject, pathOrFile)
     else:
         didOpen = False
@@ -118,6 +136,7 @@ def readPlistFromString(data):
 
 def writePlistToString(rootObject, binary=True):
     if not binary:
+        rootObject = wrapDataObject(rootObject, binary)
         return plistlib.writePlistToString(rootObject)
     else:
         io = StringIO()

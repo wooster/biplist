@@ -31,6 +31,19 @@ class TestWritePlist(unittest.TestCase):
     
     def testXMLPlist(self):
         self.roundTrip({'hello':'world'}, xml=True)
+
+    def testXMLPlistWithData(self):
+        for binmode in (True, False):
+            binplist = writePlistToString({'data': Data('\x01\xac\xf0\xff')}, binary=binmode)
+            plist = readPlistFromString(binplist)
+            self.assertTrue(isinstance(plist['data'], Data), \
+                "unable to encode then decode Data into %s plist" % ("binary" if binmode else "XML"))
+
+    def testConvertToXMLPlistWithData(self):
+        binplist = writePlistToString({'data': Data('\x01\xac\xf0\xff')})
+        plist = readPlistFromString(binplist)
+        xmlplist = writePlistToString(plist, binary=False)
+        self.assertTrue(len(xmlplist) > 0, "unable to convert plist with Data from binary to XML")
     
     def testBoolRoot(self):
         self.roundTrip(True)
