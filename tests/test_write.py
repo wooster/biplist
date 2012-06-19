@@ -2,21 +2,24 @@ from biplist import *
 from biplist import PlistWriter
 import datetime
 import os
-from cStringIO import StringIO
+#from cStringIO import StringIO
 import subprocess
 import tempfile
 from test_utils import *
 import unittest
+import six
 
 class TestWritePlist(unittest.TestCase):
     def setUp(self):
         pass
     
-    def roundTrip(self, root, xml=False):
+    def roundTrip(self, root, xml=False, expected=None):
+        # 'expected' is more fallout from the
+        # don't-write-empty-unicode-strings issue.
         plist = writePlistToString(root, binary=(not xml))
         self.assertTrue(len(plist) > 0)
         readResult = readPlistFromString(plist)
-        self.assertEquals(readResult, root)
+        self.assertEquals(readResult, (expected if expected is not None else root))
         self.lintPlist(plist)
     
     def lintPlist(self, plistString):
@@ -34,13 +37,13 @@ class TestWritePlist(unittest.TestCase):
 
     def testXMLPlistWithData(self):
         for binmode in (True, False):
-            binplist = writePlistToString({'data': Data('\x01\xac\xf0\xff')}, binary=binmode)
+            binplist = writePlistToString({'data': Data(six.b('\x01\xac\xf0\xff'))}, binary=binmode)
             plist = readPlistFromString(binplist)
             self.assertTrue(isinstance(plist['data'], Data), \
                 "unable to encode then decode Data into %s plist" % ("binary" if binmode else "XML"))
 
     def testConvertToXMLPlistWithData(self):
-        binplist = writePlistToString({'data': Data('\x01\xac\xf0\xff')})
+        binplist = writePlistToString({'data': Data(six.b('\x01\xac\xf0\xff'))})
         plist = readPlistFromString(binplist)
         xmlplist = writePlistToString(plist, binary=False)
         self.assertTrue(len(xmlplist) > 0, "unable to convert plist with Data from binary to XML")
@@ -50,7 +53,7 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(False)
     
     def testDuplicate(self):
-        l = ["foo" for i in xrange(0, 100)]
+        l = ["foo" for i in range(0, 100)]
         self.roundTrip(l)
         
     def testListRoot(self):
@@ -99,13 +102,13 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(root)
     
     def testString(self):
-        self.roundTrip('0')
-        self.roundTrip('')
-        self.roundTrip({'a':''})
+        self.roundTrip(six.b('0'))
+        self.roundTrip(six.b(''))
+        self.roundTrip({six.b('a'):six.b('')})
     
     def testLargeDict(self):
         d = {}
-        for i in xrange(0, 1000):
+        for i in range(0, 1000):
             d['%d' % i] = '%d' % i
         self.roundTrip(d)
         
@@ -121,7 +124,7 @@ class TestWritePlist(unittest.TestCase):
             path = '/var/tmp/test.plist'
             writePlist([1, 2, 3], path, binary=is_binary)
             self.assertTrue(os.path.exists(path))
-            self.lintPlist(open(path).read())
+            self.lintPlist(open(path, 'rb').read())
     
     def testNone(self):
         self.roundTrip(None)
@@ -135,7 +138,7 @@ class TestWritePlist(unittest.TestCase):
         except InvalidPlistException as e:
             pass
         try:
-            self.roundTrip({Data("hello world"):1})
+            self.roundTrip({Data(six.b("hello world")):1})
             self.fail("Data is not a valid key in Cocoa.")
         except InvalidPlistException as e:
             pass
@@ -153,7 +156,7 @@ class TestWritePlist(unittest.TestCase):
         edges = [-pow(2, 7), pow(2, 7) - 1, -pow(2, 15), pow(2, 15) - 1, -pow(2, 31), pow(2, 31) - 1]
         self.roundTrip(edges)
         
-        io = StringIO()
+        io = six.BytesIO()
         writer = PlistWriter(io)
         bytes = [(1, [pow(2, 7) - 1]),
                  (2, [pow(2, 15) - 1]),
@@ -175,16 +178,16 @@ class TestWritePlist(unittest.TestCase):
             pass
     
     def testWriteData(self):
-        self.roundTrip(Data("woohoo"))
+        self.roundTrip(Data(six.b("woohoo")))
         
     def testUnicode(self):
-        unicodeRoot = u"Mirror's Edge\u2122 for iPad"
+        unicodeRoot = six.u("Mirror's Edge\u2122 for iPad")
         writePlist(unicodeRoot, "/tmp/odd.plist")
         self.roundTrip(unicodeRoot)
-        unicodeStrings = [u"Mirror's Edge\u2122 for iPad", u'Weightbot \u2014 Track your Weight in Style']
+        unicodeStrings = [six.u("Mirror's Edge\u2122 for iPad"), six.u('Weightbot \u2014 Track your Weight in Style')]
         self.roundTrip(unicodeStrings)
-        self.roundTrip({u"":u""})
-        self.roundTrip(u"")
+        self.roundTrip({six.u(""):six.u("")}, expected={six.b(''):six.b('')})
+        self.roundTrip(six.u(""), expected=six.b(''))
         
     def testUidWrite(self):
         self.roundTrip({'$version': 100000, 
