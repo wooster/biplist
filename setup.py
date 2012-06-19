@@ -25,7 +25,8 @@ desc = 'biplist is a library for reading/writing binary plists.'
 setup(
     name = 'biplist',
     version = version,
-    url = 'https://github.com/kelleyk/py3k-biplist',
+    url = 'https://github.com/wooster/biplist',
+    download_url = 'https://github.com/wooster/biplist/downloads/biplist-0.5.tar.gz',
     license = 'BSD',
     description = desc,
     long_description = 
