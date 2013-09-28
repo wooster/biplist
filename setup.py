@@ -19,14 +19,14 @@ if major <= 1 or (major == 2 and minor < 6) or (major == 3 and minor < 2):
 
 author = 'Andrew Wooster'
 email = 'andrew@planetaryscale.com'
-version = '0.5'
+version = '0.6'
 desc = 'biplist is a library for reading/writing binary plists.'
 
 setup(
     name = 'biplist',
     version = version,
-    url = 'https://github.com/wooster/biplist',
-    download_url = 'https://github.com/wooster/biplist/downloads/biplist-0.5.tar.gz',
+    url = 'https://bitbucket.org/wooster/biplist',
+    download_url = 'https://bitbucket.org/wooster/biplist/downloads/biplist-0.6.tar.gz',
     license = 'BSD',
     description = desc,
     long_description = 
