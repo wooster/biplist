@@ -391,6 +391,19 @@ class BoolWrapper(object):
     def __repr__(self):
         return "<BoolWrapper: %s>" % self.value
 
+class FloatWrapper(object):
+    _instances = {}
+    def __new__(klass, value):
+        # Ensure FloatWrapper(x) for a given float x is always the same object
+        wrapper = klass._instances.get(value)
+        if wrapper is None:
+            wrapper = object.__new__(klass)
+            wrapper.value = value
+            klass._instances[value] = wrapper
+        return wrapper
+    def __repr__(self):
+        return "<FloatWrapper: %s>" % self.value
+
 class PlistWriter(object):
     header = six.b('bplist00bybiplist1.0')
     file = None
@@ -467,6 +480,8 @@ class PlistWriter(object):
                 return self.wrappedTrue
             else:
                 return self.wrappedFalse
+        elif isinstance(root, float):
+            return FloatWrapper(root)
         elif isinstance(root, set):
             n = set()
             for value in root:
@@ -522,7 +537,7 @@ class PlistWriter(object):
         elif isinstance(obj, six.integer_types):
             size = self.intSize(obj)
             self.incrementByteCount('intBytes', incr=1+size)
-        elif isinstance(obj, (float)):
+        elif isinstance(obj, FloatWrapper):
             size = self.realSize(obj)
             self.incrementByteCount('realBytes', incr=1+size)
         elif isinstance(obj, datetime.datetime):    
@@ -609,7 +624,7 @@ class PlistWriter(object):
             root = math.log(bytes, 2)
             output += pack('!B', (0b0001 << 4) | int(root))
             output += self.binaryInt(obj)
-        elif isinstance(obj, float):
+        elif isinstance(obj, FloatWrapper):
             # just use doubles
             output += pack('!B', (0b0010 << 4) | 3)
             output += self.binaryReal(obj)
@@ -686,7 +701,7 @@ class PlistWriter(object):
     
     def binaryReal(self, obj):
         # just use doubles
-        result = pack('>d', obj)
+        result = pack('>d', obj.value)
         return result
     
     def binaryInt(self, obj, bytes=None):

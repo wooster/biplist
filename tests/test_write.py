@@ -62,7 +62,7 @@ class TestWritePlist(unittest.TestCase):
     def testDictRoot(self):
         self.roundTrip({'a':1, 'B':'d'})
     
-    def boolsAndIntegersHelper(self, cases):
+    def mixedNumericTypesHelper(self, cases):
         result = readPlistFromString(writePlistToString(cases))
         for i in range(0, len(cases)):
             self.assertTrue(cases[i] == result[i])
@@ -73,10 +73,16 @@ class TestWritePlist(unittest.TestCase):
         self.assertEquals(repr(case), repr(result))
     
     def testBoolsAndIntegersMixed(self):
-        self.boolsAndIntegersHelper([0, 1, True, False, None])
-        self.boolsAndIntegersHelper([False, True, 0, 1, None])
+        self.mixedNumericTypesHelper([0, 1, True, False, None])
+        self.mixedNumericTypesHelper([False, True, 0, 1, None])
         self.reprChecker({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
         self.reprChecker([1, 1, 1, 1, 1, True, True, True, True])
+    
+    def testFloatsAndIntegersMixed(self):
+        self.mixedNumericTypesHelper([0, 1, 1.0, 0.0, None])
+        self.mixedNumericTypesHelper([0.0, 1.0, 0, 1, None])
+        self.reprChecker({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]})
+        self.reprChecker([1, 1, 1, 1, 1, 1.0, 1.0, 1.0, 1.0])
     
     def testSetRoot(self):
         self.roundTrip(set((1, 2, 3)))
