@@ -159,7 +159,10 @@ class TestWritePlist(unittest.TestCase):
         for edge in edges:
             cases = [edge, edge-1, edge+1, edge-2, edge+2, edge*2, edge/2]
             self.roundTrip(cases)
-        edges = [-pow(2, 7), pow(2, 7) - 1, -pow(2, 15), pow(2, 15) - 1, -pow(2, 31), pow(2, 31) - 1]
+        edges = [-pow(2, 7), pow(2, 7) - 1, 
+                 -pow(2, 15), pow(2, 15) - 1, 
+                 -pow(2, 31), pow(2, 31) - 1, 
+                 -pow(2, 63), pow(2, 64) - 1]
         self.roundTrip(edges)
         
         io = six.BytesIO()
@@ -167,7 +170,8 @@ class TestWritePlist(unittest.TestCase):
         bytes = [(1, [pow(2, 7) - 1]),
                  (2, [pow(2, 15) - 1]),
                  (4, [pow(2, 31) - 1]),
-                 (8, [-pow(2, 7), -pow(2, 15), -pow(2, 31), -pow(2, 63), pow(2, 63) - 1])
+                 (8, [-pow(2, 7), -pow(2, 15), -pow(2, 31), -pow(2, 63), pow(2, 63) - 1]),
+                 (16, [pow(2, 64) - 1])
             ]
         for bytelen, tests in bytes:
             for test in tests:
@@ -178,8 +182,8 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(bytes_lists)
         
         try:
-            self.roundTrip([0x8000000000000000, pow(2, 63)])
-            self.fail("2^63 should be too large for Core Foundation to handle.")
+            self.roundTrip([0x10000000000000000L, pow(2, 64)])
+            self.fail("2^64 should be too large for Core Foundation to handle.")
         except InvalidPlistException as e:
             pass
     

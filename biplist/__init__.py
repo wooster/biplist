@@ -51,6 +51,7 @@ import datetime
 import math
 import plistlib
 from struct import pack, unpack
+from struct import error as struct_error
 import sys
 import time
 
@@ -285,7 +286,7 @@ class PlistReader(object):
         result = 0
         original_offset = self.currentOffset
         data = self.contents[self.currentOffset:self.currentOffset+bytes]
-        result = self.getSizedInteger(data, bytes)
+        result = self.getSizedInteger(data, bytes, as_number=True)
         self.currentOffset = original_offset + bytes
         return result
     
@@ -364,7 +365,8 @@ class PlistReader(object):
     def readUid(self, length):
         return Uid(self.readInteger(length+1))
     
-    def getSizedInteger(self, data, bytes):
+    def getSizedInteger(self, data, bytes, as_number=False):
+        """Numbers of 8 bytes are signed integers when they refer to numbers, but unsigned otherwise."""
         result = 0
         # 1, 2, and 4 byte integers are unsigned
         if bytes == 1:
@@ -374,9 +376,18 @@ class PlistReader(object):
         elif bytes == 4:
             result = unpack('>L', data)[0]
         elif bytes == 8:
-            result = unpack('>q', data)[0]
+            if as_number:
+                result = unpack('>q', data)[0]
+            else:
+                result = unpack('>Q', data)[0]
+        elif bytes <= 16:
+            # Handle odd-sized or integers larger than 8 bytes
+            # Don't naively go over 16 bytes, in order to prevent infinite loops.
+            result = 0
+            for byte in data:
+                result = (result << 8) | unpack('>B', byte)[0]
         else:
-            raise InvalidPlistException("Encountered integer longer than 8 bytes.")
+            raise InvalidPlistException("Encountered integer longer than 16 bytes.")
         return result
 
 class HashableWrapper(object):
@@ -623,7 +634,7 @@ class PlistWriter(object):
             bytes = self.intSize(obj)
             root = math.log(bytes, 2)
             output += pack('!B', (0b0001 << 4) | int(root))
-            output += self.binaryInt(obj)
+            output += self.binaryInt(obj, as_number=True)
         elif isinstance(obj, FloatWrapper):
             # just use doubles
             output += pack('!B', (0b0010 << 4) | 3)
@@ -704,7 +715,7 @@ class PlistWriter(object):
         result = pack('>d', obj.value)
         return result
     
-    def binaryInt(self, obj, bytes=None):
+    def binaryInt(self, obj, bytes=None, as_number=False):
         result = six.b('')
         if bytes is None:
             bytes = self.intSize(obj)
@@ -715,9 +726,17 @@ class PlistWriter(object):
         elif bytes == 4:
             result += pack('>L', obj)
         elif bytes == 8:
-            result += pack('>q', obj)
+            if as_number:
+                result += pack('>q', obj)
+            else:
+                result += pack('>Q', obj)
+        elif bytes <= 16:
+            try:
+                result = pack('>Q', 0) + pack('>Q', obj)
+            except struct_error as e:
+                raise InvalidPlistException("Unable to pack integer %d: %s" % (obj, e))
         else:
-            raise InvalidPlistException("Core Foundation can't handle integers with size greater than 8 bytes.")
+            raise InvalidPlistException("Core Foundation can't handle integers with size greater than 16 bytes.")
         return result
     
     def intSize(self, obj):
@@ -734,8 +753,10 @@ class PlistWriter(object):
             return 4
         # SIGNED
         # 0x7FFFFFFFFFFFFFFF is the max.
-        elif obj <= 0x7FFFFFFFFFFFFFFF: # 8 bytes
+        elif obj <= 0x7FFFFFFFFFFFFFFF: # 8 bytes signed
             return 8
+        elif obj <= 0xffffffffffffffff: # 8 bytes unsigned
+            return 16
         else:
             raise InvalidPlistException("Core Foundation can't handle integers with size greater than 8 bytes.")
     

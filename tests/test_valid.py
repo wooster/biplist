@@ -48,6 +48,12 @@ class TestValidPlistFile(unittest.TestCase):
         result = readPlist(data_path('small_real.plist'))
         self.assertEquals(result, {six.b('4 byte real'):0.5})
     
+    def testLargeIntegers(self):
+        result = readPlist(data_path('large_int_limits.plist'))
+        self.assertEquals(result[six.b('Max 8 Byte Unsigned Integer')], 18446744073709551615L)
+        self.assertEquals(result[six.b('Min 8 Byte Signed Integer')], -9223372036854775808L)
+        self.assertEquals(result[six.b('Max 8 Byte Signed Integer')], 9223372036854775807L)
+
     def testKeyedArchiverPlist(self):
         """
         Archive is created with class like this:
