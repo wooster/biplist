@@ -99,8 +99,9 @@ def readPlist(pathOrFile):
             result = wrapDataObject(result, for_binary=True)
         except Exception as e:
             raise InvalidPlistException(e)
-    if didOpen:
-        pathOrFile.close()
+    finally:
+        if didOpen:
+            pathOrFile.close()
     return result
 
 def wrapDataObject(o, for_binary=False):
@@ -384,8 +385,11 @@ class PlistReader(object):
             # Handle odd-sized or integers larger than 8 bytes
             # Don't naively go over 16 bytes, in order to prevent infinite loops.
             result = 0
-            for byte in data:
-                result = (result << 8) | unpack('>B', byte)[0]
+            if hasattr(int, 'from_bytes'):
+                result = int.from_bytes(data, 'big')
+            else:
+                for byte in data:
+                    result = (result << 8) | unpack('>B', byte)[0]
         else:
             raise InvalidPlistException("Encountered integer longer than 16 bytes.")
         return result
