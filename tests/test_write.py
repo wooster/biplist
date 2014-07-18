@@ -39,7 +39,7 @@ class TestWritePlist(unittest.TestCase):
         for binmode in (True, False):
             binplist = writePlistToString({'data': Data(six.b('\x01\xac\xf0\xff'))}, binary=binmode)
             plist = readPlistFromString(binplist)
-            self.assertTrue(isinstance(plist['data'], Data), \
+            self.assertTrue(isinstance(plist['data'], (Data, six.binary_type)), \
                 "unable to encode then decode Data into %s plist" % ("binary" if binmode else "XML"))
 
     def testConvertToXMLPlistWithData(self):

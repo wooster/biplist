@@ -95,7 +95,17 @@ def readPlist(pathOrFile):
     except NotBinaryPlistException as e:
         try:
             pathOrFile.seek(0)
-            result = plistlib.readPlist(pathOrFile)
+            result = None
+            if hasattr(plistlib, 'loads'):
+                contents = None
+                if isinstance(pathOrFile, (six.binary_type, six.text_type)):
+                    with open(pathOrFile, 'rb') as f:
+                        contents = f.read()
+                else:
+                    contents = pathOrFile.read()
+                result = plistlib.loads(contents)
+            else:
+                result = plistlib.readPlist(pathOrFile)
             result = wrapDataObject(result, for_binary=True)
         except Exception as e:
             raise InvalidPlistException(e)
@@ -106,9 +116,12 @@ def readPlist(pathOrFile):
 
 def wrapDataObject(o, for_binary=False):
     if isinstance(o, Data) and not for_binary:
-        o = plistlib.Data(o)
-    elif isinstance(o, plistlib.Data) and for_binary:
-        o = Data(o.data)
+        v = sys.version_info
+        if not (v[0] >= 3 and v[1] >= 4):
+            o = plistlib.Data(o)
+    elif isinstance(o, (six.binary_type, plistlib.Data)) and for_binary:
+        if hasattr(o, 'data'):
+            o = Data(o.data)
     elif isinstance(o, tuple):
         o = wrapDataObject(list(o), for_binary)
         o = tuple(o)
@@ -123,7 +136,14 @@ def wrapDataObject(o, for_binary=False):
 def writePlist(rootObject, pathOrFile, binary=True):
     if not binary:
         rootObject = wrapDataObject(rootObject, binary)
-        return plistlib.writePlist(rootObject, pathOrFile)
+        if hasattr(plistlib, "dump"):
+            if isinstance(pathOrFile, (six.binary_type, six.text_type)):
+                with open(pathOrFile, 'wb') as f:
+                    return plistlib.dump(rootObject, f)
+            else:
+                return plistlib.dump(rootObject, pathOrFile)
+        else:
+            return plistlib.writePlist(rootObject, pathOrFile)
     else:
         didOpen = False
         if isinstance(pathOrFile, (six.binary_type, six.text_type)):
@@ -142,7 +162,10 @@ def writePlistToString(rootObject, binary=True):
     if not binary:
         rootObject = wrapDataObject(rootObject, binary)
         if six.PY3:
-            return plistlib.writePlistToBytes(rootObject)
+            if hasattr(plistlib, "dumps"):
+                return plistlib.dumps(rootObject)
+            else:
+                return plistlib.writePlistToBytes(rootObject)
         else:
             return plistlib.writePlistToString(rootObject)
     else:
