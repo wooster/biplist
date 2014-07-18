@@ -12,7 +12,12 @@ class TestValidPlistFile(unittest.TestCase):
     def validateSimpleBinaryRoot(self, root):
         self.assertTrue(type(root) == dict, "Root should be dictionary.")
         self.assertTrue(type(root[six.b('dateItem')]) == datetime.datetime, "date should be datetime")
-        self.assertEqual(root[six.b('dateItem')], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
+        us = root[six.b('dateItem')].microsecond
+        if us == 385448:
+            # Python 3 doesn't round microseconds to the nearest value.
+            self.assertEqual(root[six.b('dateItem')], datetime.datetime(2010, 8, 19, 22, 27, 30, 385448), "dates not equal" )
+        else:
+            self.assertEqual(root[six.b('dateItem')], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
         self.assertEqual(root[six.b('numberItem')], -10000000000000000, "number not of expected value")
         self.assertEqual(root[six.b('unicodeItem')], six.u('abc\u212cdef\u2133'))
         self.assertEqual(root[six.b('stringItem')], six.b('Hi there'))
