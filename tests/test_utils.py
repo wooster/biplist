@@ -15,5 +15,6 @@ def run_command(args, verbose = False):
     output = stdout.read()
     output = output.strip(six.b("\n"))
     status = stdin.close()
+    stdout.close()
     p.wait()
     return p.returncode, output
