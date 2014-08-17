@@ -132,7 +132,6 @@ class TestWritePlist(unittest.TestCase):
             self.assertTrue(os.path.exists(path))
             with open(path, 'rb') as f:
                 self.lintPlist(f.read())
-            #self.lintPlist(open(path, 'rb').read())
     
     def testNone(self):
         self.roundTrip(None)
