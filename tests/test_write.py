@@ -1,13 +1,18 @@
 from biplist import *
 from biplist import PlistWriter
 import datetime
+import io
 import os
 #from cStringIO import StringIO
 import subprocess
 import tempfile
 from test_utils import *
 import unittest
-import six
+
+try:
+    unicode
+except NameError:
+    unicode = str
 
 class TestWritePlist(unittest.TestCase):
     def setUp(self):
@@ -37,13 +42,13 @@ class TestWritePlist(unittest.TestCase):
 
     def testXMLPlistWithData(self):
         for binmode in (True, False):
-            binplist = writePlistToString({'data': Data(six.b('\x01\xac\xf0\xff'))}, binary=binmode)
+            binplist = writePlistToString({'data': Data(b'\x01\xac\xf0\xff')}, binary=binmode)
             plist = readPlistFromString(binplist)
-            self.assertTrue(isinstance(plist['data'], (Data, six.binary_type)), \
+            self.assertTrue(isinstance(plist['data'], (Data, bytes)), \
                 "unable to encode then decode Data into %s plist" % ("binary" if binmode else "XML"))
 
     def testConvertToXMLPlistWithData(self):
-        binplist = writePlistToString({'data': Data(six.b('\x01\xac\xf0\xff'))})
+        binplist = writePlistToString({'data': Data(b'\x01\xac\xf0\xff')})
         plist = readPlistFromString(binplist)
         xmlplist = writePlistToString(plist, binary=False)
         self.assertTrue(len(xmlplist) > 0, "unable to convert plist with Data from binary to XML")
@@ -75,13 +80,13 @@ class TestWritePlist(unittest.TestCase):
     def testBoolsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, True, False, None])
         self.mixedNumericTypesHelper([False, True, 0, 1, None])
-        self.reprChecker({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
+        self.reprChecker({unicode('1'):[True, False, 1, 0], unicode('0'):[1, 2, 0, {unicode('2'):[1, 0, False]}]})
         self.reprChecker([1, 1, 1, 1, 1, True, True, True, True])
     
     def testFloatsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, 1.0, 0.0, None])
         self.mixedNumericTypesHelper([0.0, 1.0, 0, 1, None])
-        self.reprChecker({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]})
+        self.reprChecker({unicode('1'):[1.0, 0.0, 1, 0], unicode('0'):[1, 2, 0, {unicode('2'):[1, 0, 0.0]}]})
         self.reprChecker([1, 1, 1, 1, 1, 1.0, 1.0, 1.0, 1.0])
     
     def testSetRoot(self):
@@ -108,9 +113,9 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(root)
     
     def testString(self):
-        self.roundTrip(six.b('0'))
-        self.roundTrip(six.b(''))
-        self.roundTrip({six.b('a'):six.b('')})
+        self.roundTrip(b'0')
+        self.roundTrip(b'')
+        self.roundTrip({b'a':b''})
     
     def testLargeDict(self):
         d = {}
@@ -145,7 +150,7 @@ class TestWritePlist(unittest.TestCase):
         except InvalidPlistException as e:
             pass
         try:
-            self.roundTrip({Data(six.b("hello world")):1})
+            self.roundTrip({Data(b"hello world"):1})
             self.fail("Data is not a valid key in Cocoa.")
         except InvalidPlistException as e:
             pass
@@ -166,8 +171,8 @@ class TestWritePlist(unittest.TestCase):
                  -pow(2, 63), pow(2, 64) - 1]
         self.roundTrip(edges)
         
-        io = six.BytesIO()
-        writer = PlistWriter(io)
+        ioBytes = io.BytesIO()
+        writer = PlistWriter(ioBytes)
         bytes = [(1, [pow(2, 7) - 1]),
                  (2, [pow(2, 15) - 1]),
                  (4, [pow(2, 31) - 1]),
@@ -189,16 +194,16 @@ class TestWritePlist(unittest.TestCase):
             pass
     
     def testWriteData(self):
-        self.roundTrip(Data(six.b("woohoo")))
+        self.roundTrip(Data(b"woohoo"))
         
     def testUnicode(self):
-        unicodeRoot = six.u("Mirror's Edge\u2122 for iPad")
+        unicodeRoot = unicode("Mirror's Edge\u2122 for iPad")
         writePlist(unicodeRoot, "/tmp/odd.plist")
         self.roundTrip(unicodeRoot)
-        unicodeStrings = [six.u("Mirror's Edge\u2122 for iPad"), six.u('Weightbot \u2014 Track your Weight in Style')]
+        unicodeStrings = [unicode("Mirror's Edge\u2122 for iPad"), unicode('Weightbot \u2014 Track your Weight in Style')]
         self.roundTrip(unicodeStrings)
-        self.roundTrip({six.u(""):six.u("")}, expected={six.b(''):six.b('')})
-        self.roundTrip(six.u(""), expected=six.b(''))
+        self.roundTrip({unicode(""):unicode("")}, expected={b'':b''})
+        self.roundTrip(unicode(""), expected=b'')
         
     def testUidWrite(self):
         self.roundTrip({'$version': 100000, 

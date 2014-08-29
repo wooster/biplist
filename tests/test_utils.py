@@ -1,7 +1,6 @@
 import os
 import subprocess
 import sys
-import six
 
 def data_path(path):
     return os.path.join(os.path.dirname(globals()["__file__"]), 'data', path)
@@ -13,7 +12,7 @@ def run_command(args, verbose = False):
     p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     stdin, stdout = (p.stdin, p.stdout)
     output = stdout.read()
-    output = output.strip(six.b("\n"))
+    output = output.strip(b'\n')
     status = stdin.close()
     stdout.close()
     p.wait()
