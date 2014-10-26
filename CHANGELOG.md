@@ -1,7 +1,9 @@
-2014-10-26 wooster (in progress)
---------------------------------
+2014-10-26 wooster v0.9
+-----------------------
 
 Fixes [\#5 ValueError: timestamp out of range for platform time_t](https://bitbucket.org/wooster/biplist/issue/5/valueerror-timestamp-out-of-range-for)
+
+Merged pull request [\#3 removing the `six` module while keeping Python3 compatibility](https://bitbucket.org/wooster/biplist/pull-request/3)
 
 2014-08-17 wooster v0.8 
 -----------------------
