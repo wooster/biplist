@@ -48,6 +48,7 @@ import sys
 from collections import namedtuple
 import calendar
 import datetime
+import io
 import math
 import plistlib
 from struct import pack, unpack
@@ -55,7 +56,21 @@ from struct import error as struct_error
 import sys
 import time
 
-import six
+try:
+    unicode
+    unicodeEmpty = r''
+except NameError:
+    unicode = str
+    unicodeEmpty = ''
+try:
+    long
+except NameError:
+    long = int
+try:
+    {}.iteritems
+    iteritems = lambda x: x.iteritems()
+except AttributeError:
+    iteritems = lambda x: x.items()
 
 __all__ = [
     'Uid', 'Data', 'readPlist', 'writePlist', 'readPlistFromString',
@@ -70,7 +85,7 @@ class Uid(int):
     def __repr__(self):
         return "Uid(%d)" % self
 
-class Data(six.binary_type):
+class Data(bytes):
     """Wrapper around str types for representing Data values."""
     pass
 
@@ -86,7 +101,7 @@ def readPlist(pathOrFile):
     """Raises NotBinaryPlistException, InvalidPlistException"""
     didOpen = False
     result = None
-    if isinstance(pathOrFile, (six.binary_type, six.text_type)):
+    if isinstance(pathOrFile, (bytes, unicode)):
         pathOrFile = open(pathOrFile, 'rb')
         didOpen = True
     try:
@@ -98,7 +113,7 @@ def readPlist(pathOrFile):
             result = None
             if hasattr(plistlib, 'loads'):
                 contents = None
-                if isinstance(pathOrFile, (six.binary_type, six.text_type)):
+                if isinstance(pathOrFile, (bytes, unicode)):
                     with open(pathOrFile, 'rb') as f:
                         contents = f.read()
                 else:
@@ -119,7 +134,7 @@ def wrapDataObject(o, for_binary=False):
         v = sys.version_info
         if not (v[0] >= 3 and v[1] >= 4):
             o = plistlib.Data(o)
-    elif isinstance(o, (six.binary_type, plistlib.Data)) and for_binary:
+    elif isinstance(o, (bytes, plistlib.Data)) and for_binary:
         if hasattr(o, 'data'):
             o = Data(o.data)
     elif isinstance(o, tuple):
@@ -137,7 +152,7 @@ def writePlist(rootObject, pathOrFile, binary=True):
     if not binary:
         rootObject = wrapDataObject(rootObject, binary)
         if hasattr(plistlib, "dump"):
-            if isinstance(pathOrFile, (six.binary_type, six.text_type)):
+            if isinstance(pathOrFile, (bytes, unicode)):
                 with open(pathOrFile, 'wb') as f:
                     return plistlib.dump(rootObject, f)
             else:
@@ -146,7 +161,7 @@ def writePlist(rootObject, pathOrFile, binary=True):
             return plistlib.writePlist(rootObject, pathOrFile)
     else:
         didOpen = False
-        if isinstance(pathOrFile, (six.binary_type, six.text_type)):
+        if isinstance(pathOrFile, (bytes, unicode)):
             pathOrFile = open(pathOrFile, 'wb')
             didOpen = True
         writer = PlistWriter(pathOrFile)
@@ -156,28 +171,27 @@ def writePlist(rootObject, pathOrFile, binary=True):
         return result
 
 def readPlistFromString(data):
-    return readPlist(six.BytesIO(data))
+    return readPlist(io.BytesIO(data))
 
 def writePlistToString(rootObject, binary=True):
     if not binary:
         rootObject = wrapDataObject(rootObject, binary)
-        if six.PY3:
-            if hasattr(plistlib, "dumps"):
-                return plistlib.dumps(rootObject)
-            else:
-                return plistlib.writePlistToBytes(rootObject)
+        if hasattr(plistlib, "dumps"):
+            return plistlib.dumps(rootObject)
+        elif hasattr(plistlib, "writePlistToBytes"):
+            return plistlib.writePlistToBytes(rootObject)
         else:
             return plistlib.writePlistToString(rootObject)
     else:
-        io = six.BytesIO()
-        writer = PlistWriter(io)
+        ioObject = io.BytesIO()
+        writer = PlistWriter(ioObject)
         writer.writeRoot(rootObject)
-        return io.getvalue()
+        return ioObject.getvalue()
 
 def is_stream_binary_plist(stream):
     stream.seek(0)
     header = stream.read(7)
-    if header == six.b('bplist0'):
+    if header == b'bplist0':
         return True
     else:
         return False
@@ -306,12 +320,12 @@ class PlistReader(object):
             raise InvalidPlistException("Invalid object found: {format: %s, extra: %s}" % (bin(format), bin(extra)))
         return result
     
-    def readInteger(self, bytes):
+    def readInteger(self, byteSize):
         result = 0
         original_offset = self.currentOffset
-        data = self.contents[self.currentOffset:self.currentOffset+bytes]
-        result = self.getSizedInteger(data, bytes, as_number=True)
-        self.currentOffset = original_offset + bytes
+        data = self.contents[self.currentOffset:self.currentOffset + byteSize]
+        result = self.getSizedInteger(data, byteSize, as_number=True)
+        self.currentOffset = original_offset + byteSize
         return result
     
     def readReal(self, length):
@@ -389,22 +403,22 @@ class PlistReader(object):
     def readUid(self, length):
         return Uid(self.readInteger(length+1))
     
-    def getSizedInteger(self, data, bytes, as_number=False):
+    def getSizedInteger(self, data, byteSize, as_number=False):
         """Numbers of 8 bytes are signed integers when they refer to numbers, but unsigned otherwise."""
         result = 0
         # 1, 2, and 4 byte integers are unsigned
-        if bytes == 1:
+        if byteSize == 1:
             result = unpack('>B', data)[0]
-        elif bytes == 2:
+        elif byteSize == 2:
             result = unpack('>H', data)[0]
-        elif bytes == 4:
+        elif byteSize == 4:
             result = unpack('>L', data)[0]
-        elif bytes == 8:
+        elif byteSize == 8:
             if as_number:
                 result = unpack('>q', data)[0]
             else:
                 result = unpack('>Q', data)[0]
-        elif bytes <= 16:
+        elif byteSize <= 16:
             # Handle odd-sized or integers larger than 8 bytes
             # Don't naively go over 16 bytes, in order to prevent infinite loops.
             result = 0
@@ -443,7 +457,7 @@ class FloatWrapper(object):
         return "<FloatWrapper: %s>" % self.value
 
 class PlistWriter(object):
-    header = six.b('bplist00bybiplist1.0')
+    header = b'bplist00bybiplist1.0'
     file = None
     byteCounts = None
     trailer = None
@@ -527,7 +541,7 @@ class PlistWriter(object):
             return HashableWrapper(n)
         elif isinstance(root, dict):
             n = {}
-            for key, value in six.iteritems(root):
+            for key, value in iteritems(root):
                 n[self.wrapRoot(key)] = self.wrapRoot(value)
             return HashableWrapper(n)
         elif isinstance(root, list):
@@ -550,7 +564,7 @@ class PlistWriter(object):
                 raise InvalidPlistException('Dictionary keys cannot be null in plists.')
             elif isinstance(key, Data):
                 raise InvalidPlistException('Data cannot be dictionary keys in plists.')
-            elif not isinstance(key, (six.binary_type, six.text_type)):
+            elif not isinstance(key, (bytes, unicode)):
                 raise InvalidPlistException('Keys must be strings.')
         
         def proc_size(size):
@@ -572,7 +586,7 @@ class PlistWriter(object):
         elif isinstance(obj, Uid):
             size = self.intSize(obj)
             self.incrementByteCount('uidBytes', incr=1+size)
-        elif isinstance(obj, six.integer_types):
+        elif isinstance(obj, (int, long)):
             size = self.intSize(obj)
             self.incrementByteCount('intBytes', incr=1+size)
         elif isinstance(obj, FloatWrapper):
@@ -583,7 +597,7 @@ class PlistWriter(object):
         elif isinstance(obj, Data):
             size = proc_size(len(obj))
             self.incrementByteCount('dataBytes', incr=1+size)
-        elif isinstance(obj, (six.text_type, six.binary_type)):
+        elif isinstance(obj, (unicode, bytes)):
             size = proc_size(len(obj))
             self.incrementByteCount('stringBytes', incr=1+size)
         elif isinstance(obj, HashableWrapper):
@@ -602,7 +616,7 @@ class PlistWriter(object):
             elif isinstance(obj, dict):
                 size = proc_size(len(obj))
                 self.incrementByteCount('dictBytes', incr=1+size)
-                for key, value in six.iteritems(obj):
+                for key, value in iteritems(obj):
                     check_key(key)
                     self.computeOffsets(key, asReference=True)
                     self.computeOffsets(value, asReference=True)
@@ -619,10 +633,10 @@ class PlistWriter(object):
         position = self.positionOfObjectReference(obj)
         if position is None:
             self.writtenReferences[obj] = len(self.writtenReferences)
-            output += self.binaryInt(len(self.writtenReferences) - 1, bytes=self.trailer.objectRefSize)
+            output += self.binaryInt(len(self.writtenReferences) - 1, byteSize=self.trailer.objectRefSize)
             return (True, output)
         else:
-            output += self.binaryInt(position, bytes=self.trailer.objectRefSize)
+            output += self.binaryInt(position, byteSize=self.trailer.objectRefSize)
             return (False, output)
 
     def writeObject(self, obj, output, setReferencePosition=False):
@@ -631,7 +645,7 @@ class PlistWriter(object):
            object was written.
         """
         def proc_variable_length(format, length):
-            result = six.b('')
+            result = b''
             if length > 0b1110:
                 result += pack('!B', (format << 4) | 0b1111)
                 result = self.writeObject(length, result)
@@ -639,9 +653,9 @@ class PlistWriter(object):
                 result += pack('!B', (format << 4) | length)
             return result
         
-        if isinstance(obj, six.text_type) and obj == six.u(''):
+        if isinstance(obj, (str, unicode)) and obj == unicodeEmpty:
             # The Apple Plist decoder can't decode a zero length Unicode string.
-            obj = six.b('')
+            obj = b''
        
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
@@ -657,9 +671,9 @@ class PlistWriter(object):
             size = self.intSize(obj)
             output += pack('!B', (0b1000 << 4) | size - 1)
             output += self.binaryInt(obj)
-        elif isinstance(obj, six.integer_types):
-            bytes = self.intSize(obj)
-            root = math.log(bytes, 2)
+        elif isinstance(obj, (int, long)):
+            byteSize = self.intSize(obj)
+            root = math.log(byteSize, 2)
             output += pack('!B', (0b0001 << 4) | int(root))
             output += self.binaryInt(obj, as_number=True)
         elif isinstance(obj, FloatWrapper):
@@ -674,14 +688,13 @@ class PlistWriter(object):
         elif isinstance(obj, Data):
             output += proc_variable_length(0b0100, len(obj))
             output += obj
-        elif isinstance(obj, six.text_type):
-            bytes = obj.encode('utf_16_be')
-            output += proc_variable_length(0b0110, len(bytes)//2)
-            output += bytes
-        elif isinstance(obj, six.binary_type):
-            bytes = obj
-            output += proc_variable_length(0b0101, len(bytes))
-            output += bytes
+        elif isinstance(obj, unicode):
+            byteData = obj.encode('utf_16_be')
+            output += proc_variable_length(0b0110, len(byteData)//2)
+            output += byteData
+        elif isinstance(obj, bytes):
+            output += proc_variable_length(0b0101, len(obj))
+            output += obj
         elif isinstance(obj, HashableWrapper):
             obj = obj.value
             if isinstance(obj, (set, list, tuple)):
@@ -702,7 +715,7 @@ class PlistWriter(object):
                 keys = []
                 values = []
                 objectsToWrite = []
-                for key, value in six.iteritems(obj):
+                for key, value in iteritems(obj):
                     keys.append(key)
                     values.append(value)
                 for key in keys:
@@ -728,8 +741,8 @@ class PlistWriter(object):
             # goes into writtenReferences.  This isn't an issue in Py2
             # because u'' and b'' have the same hash; but it is in
             # Py3, where they don't.
-            if six.PY3 and obj == six.u(''):
-                obj = six.b('')
+            if bytes != str and obj == unicodeEmpty:
+                obj = b''
             position = self.referencePositions.get(obj)
             if position is None:
                 raise InvalidPlistException("Error while writing offsets table. Object not found. %s" % obj)
@@ -742,22 +755,22 @@ class PlistWriter(object):
         result = pack('>d', obj.value)
         return result
     
-    def binaryInt(self, obj, bytes=None, as_number=False):
-        result = six.b('')
-        if bytes is None:
-            bytes = self.intSize(obj)
-        if bytes == 1:
+    def binaryInt(self, obj, byteSize=None, as_number=False):
+        result = b''
+        if byteSize is None:
+            byteSize = self.intSize(obj)
+        if byteSize == 1:
             result += pack('>B', obj)
-        elif bytes == 2:
+        elif byteSize == 2:
             result += pack('>H', obj)
-        elif bytes == 4:
+        elif byteSize == 4:
             result += pack('>L', obj)
-        elif bytes == 8:
+        elif byteSize == 8:
             if as_number:
                 result += pack('>q', obj)
             else:
                 result += pack('>Q', obj)
-        elif bytes <= 16:
+        elif byteSize <= 16:
             try:
                 result = pack('>Q', 0) + pack('>Q', obj)
             except struct_error as e:

@@ -1,9 +1,17 @@
+# -*- coding: utf-8 -*-
+
 from biplist import *
 import datetime
 import os
 from test_utils import *
 import unittest
-import six
+
+try:
+    unicode
+    toUnicode = lambda x: x.decode('unicode-escape')
+except NameError:
+    unicode = str
+    toUnicode = lambda x: x
 
 class TestValidPlistFile(unittest.TestCase):
     def setUp(self):
@@ -11,19 +19,19 @@ class TestValidPlistFile(unittest.TestCase):
     
     def validateSimpleBinaryRoot(self, root):
         self.assertTrue(type(root) == dict, "Root should be dictionary.")
-        self.assertTrue(type(root[six.b('dateItem')]) == datetime.datetime, "date should be datetime")
-        us = root[six.b('dateItem')].microsecond
+        self.assertTrue(type(root[b'dateItem']) == datetime.datetime, "date should be datetime")
+        us = root[b'dateItem'].microsecond
         if us == 385448:
             # Python 3 doesn't round microseconds to the nearest value.
-            self.assertEqual(root[six.b('dateItem')], datetime.datetime(2010, 8, 19, 22, 27, 30, 385448), "dates not equal" )
+            self.assertEqual(root[b'dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385448), "dates not equal" )
         else:
-            self.assertEqual(root[six.b('dateItem')], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
-        self.assertEqual(root[six.b('numberItem')], -10000000000000000, "number not of expected value")
-        self.assertEqual(root[six.b('unicodeItem')], six.u('abc\u212cdef\u2133'))
-        self.assertEqual(root[six.b('stringItem')], six.b('Hi there'))
-        self.assertEqual(root[six.b('realItem')], 0.47)
-        self.assertEqual(root[six.b('boolItem')], True)
-        self.assertEqual(root[six.b('arrayItem')], [six.b('item0')])
+            self.assertEqual(root[b'dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
+        self.assertEqual(root[b'numberItem'], -10000000000000000, "number not of expected value")
+        self.assertEqual(root[b'unicodeItem'], toUnicode('abc\u212cdef\u2133'))
+        self.assertEqual(root[b'stringItem'], b'Hi there')
+        self.assertEqual(root[b'realItem'], 0.47)
+        self.assertEqual(root[b'boolItem'], True)
+        self.assertEqual(root[b'arrayItem'], [b'item0'])
         
     def testFileRead(self):
         try:
@@ -36,7 +44,7 @@ class TestValidPlistFile(unittest.TestCase):
     
     def testUnicodeRoot(self):
         result = readPlist(data_path('unicode_root.plist'))
-        self.assertEqual(result, six.u("Mirror's Edge\u2122 for iPad"))
+        self.assertEqual(result, toUnicode("Mirror's Edge\u2122 for iPad"))
     
     def testEmptyUnicodeRoot(self):
         # Porting note: this test was tricky; it was only passing in
@@ -47,17 +55,17 @@ class TestValidPlistFile(unittest.TestCase):
         # 0b0101 (ASCII string), so the value being asserted against
         # appears to be what is wrong.
         result = readPlist(data_path('unicode_empty.plist'))
-        self.assertEqual(result, six.b(""))
+        self.assertEqual(result, b'')
     
     def testSmallReal(self):
         result = readPlist(data_path('small_real.plist'))
-        self.assertEqual(result, {six.b('4 byte real'):0.5})
+        self.assertEqual(result, {b'4 byte real':0.5})
     
     def testLargeIntegers(self):
         result = readPlist(data_path('large_int_limits.plist'))
-        self.assertEqual(result[six.b('Max 8 Byte Unsigned Integer')], 18446744073709551615)
-        self.assertEqual(result[six.b('Min 8 Byte Signed Integer')], -9223372036854775808)
-        self.assertEqual(result[six.b('Max 8 Byte Signed Integer')], 9223372036854775807)
+        self.assertEqual(result[b'Max 8 Byte Unsigned Integer'], 18446744073709551615)
+        self.assertEqual(result[b'Min 8 Byte Signed Integer'], -9223372036854775808)
+        self.assertEqual(result[b'Max 8 Byte Signed Integer'], 9223372036854775807)
 
     def testKeyedArchiverPlist(self):
         """
@@ -74,14 +82,14 @@ class TestValidPlistFile(unittest.TestCase):
         ...
         """
         result = readPlist(data_path('nskeyedarchiver_example.plist'))
-        self.assertEqual(result, {six.b('$version'): 100000, 
-            six.b('$objects'): 
-                [six.b('$null'),
-                 {six.b('$class'): Uid(3), six.b('somekey'): Uid(2)}, 
-                 six.b('object value as string'),
-                 {six.b('$classes'): [six.b('Archived'), six.b('NSObject')], six.b('$classname'): six.b('Archived')}
+        self.assertEqual(result, {b'$version': 100000, 
+            b'$objects': 
+                [b'$null',
+                 {b'$class': Uid(3), b'somekey': Uid(2)}, 
+                 b'object value as string',
+                 {b'$classes': [b'Archived', b'NSObject'], b'$classname': b'Archived'}
                  ], 
-            six.b('$top'): {six.b('root'): Uid(1)}, six.b('$archiver'): six.b('NSKeyedArchiver')})
+            b'$top': {b'root': Uid(1)}, b'$archiver': b'NSKeyedArchiver'})
         self.assertEqual("Uid(1)", repr(Uid(1)))
     
 if __name__ == '__main__':

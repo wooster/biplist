@@ -17,14 +17,14 @@ class TestInvalidPlistFile(unittest.TestCase):
     
     def testTooShort(self):
         try:
-            readPlistFromString(six.b("bplist0"))
+            readPlistFromString(b"bplist0")
             self.fail("Should not successfully read plist which is too short.")
         except InvalidPlistException as e:
             pass
     
     def testInvalid(self):
         try:
-            readPlistFromString(six.b("bplist0-------------------------------------"))
+            readPlistFromString(b"bplist0-------------------------------------")
             self.fail("Should not successfully read invalid plist.")
         except InvalidPlistException as e:
             pass
