@@ -46,7 +46,6 @@ Plist parsing example:
 
 import sys
 from collections import namedtuple
-import calendar
 import datetime
 import io
 import math
@@ -77,7 +76,8 @@ __all__ = [
     'writePlistToString', 'InvalidPlistException', 'NotBinaryPlistException'
 ]
 
-apple_reference_date_offset = 978307200
+# Apple uses Jan 1, 2001 as a base for all plist date/times.
+apple_reference_date = datetime.datetime.utcfromtimestamp(978307200)
 
 class Uid(int):
     """Wrapper around integers for representing UID values. This
@@ -389,9 +389,9 @@ class PlistReader(object):
         return data.decode('utf_16_be')
     
     def readDate(self):
-        global apple_reference_date_offset
         result = unpack(">d", self.contents[self.currentOffset:self.currentOffset+8])[0]
-        result = datetime.datetime.utcfromtimestamp(result + apple_reference_date_offset)
+        # Use timedelta to workaround time_t size limitation on 32-bit python.
+        result = datetime.timedelta(seconds=result) + apple_reference_date
         self.currentOffset += 8
         return result
     
@@ -681,8 +681,7 @@ class PlistWriter(object):
             output += pack('!B', (0b0010 << 4) | 3)
             output += self.binaryReal(obj)
         elif isinstance(obj, datetime.datetime):
-            timestamp = calendar.timegm(obj.utctimetuple())
-            timestamp -= apple_reference_date_offset
+            timestamp = (obj - apple_reference_date).total_seconds()
             output += pack('!B', 0b00110011)
             output += pack('!d', float(timestamp))
         elif isinstance(obj, Data):

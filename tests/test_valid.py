@@ -66,6 +66,10 @@ class TestValidPlistFile(unittest.TestCase):
         self.assertEqual(result[b'Max 8 Byte Unsigned Integer'], 18446744073709551615)
         self.assertEqual(result[b'Min 8 Byte Signed Integer'], -9223372036854775808)
         self.assertEqual(result[b'Max 8 Byte Signed Integer'], 9223372036854775807)
+    
+    def testLargeDates(self):
+        result = readPlist(data_path("BFPersistentEventInfo.plist"))
+        self.assertEqual(result['lastShownRatePromptDate'], datetime.datetime(1, 12, 30, 0, 0, 0))
 
     def testKeyedArchiverPlist(self):
         """

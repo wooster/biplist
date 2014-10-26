@@ -1,3 +1,8 @@
+2014-10-26 wooster (in progress)
+--------------------------------
+
+Fixes [\#5 ValueError: timestamp out of range for platform time_t](https://bitbucket.org/wooster/biplist/issue/5/valueerror-timestamp-out-of-range-for)
+
 2014-08-17 wooster v0.8 
 -----------------------
 
