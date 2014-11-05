@@ -1,9 +1,11 @@
+#!/usr/local/env python
+# -*- coding: utf-8 -*-
+
 from biplist import *
 from biplist import PlistWriter
 import datetime
 import io
 import os
-#from cStringIO import StringIO
 import subprocess
 import tempfile
 from test_utils import *
@@ -13,6 +15,11 @@ try:
     unicode
 except NameError:
     unicode = str
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 class TestWritePlist(unittest.TestCase):
     def setUp(self):
@@ -58,7 +65,7 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(False)
     
     def testDuplicate(self):
-        l = ["foo" for i in range(0, 100)]
+        l = ["foo" for i in xrange(0, 100)]
         self.roundTrip(l)
         
     def testListRoot(self):
@@ -69,7 +76,7 @@ class TestWritePlist(unittest.TestCase):
     
     def mixedNumericTypesHelper(self, cases):
         result = readPlistFromString(writePlistToString(cases))
-        for i in range(0, len(cases)):
+        for i in xrange(0, len(cases)):
             self.assertTrue(cases[i] == result[i])
             self.assertEqual(type(cases[i]), type(result[i]), "Type mismatch on %d: %s != %s" % (i, repr(cases[i]), repr(result[i])))
     
@@ -80,13 +87,13 @@ class TestWritePlist(unittest.TestCase):
     def testBoolsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, True, False, None])
         self.mixedNumericTypesHelper([False, True, 0, 1, None])
-        self.reprChecker({unicode('1'):[True, False, 1, 0], unicode('0'):[1, 2, 0, {unicode('2'):[1, 0, False]}]})
+        self.reprChecker({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
         self.reprChecker([1, 1, 1, 1, 1, True, True, True, True])
     
     def testFloatsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, 1.0, 0.0, None])
         self.mixedNumericTypesHelper([0.0, 1.0, 0, 1, None])
-        self.reprChecker({unicode('1'):[1.0, 0.0, 1, 0], unicode('0'):[1, 2, 0, {unicode('2'):[1, 0, 0.0]}]})
+        self.reprChecker({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]})
         self.reprChecker([1, 1, 1, 1, 1, 1.0, 1.0, 1.0, 1.0])
     
     def testSetRoot(self):
@@ -116,11 +123,11 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(b'0')
         self.roundTrip(b'')
         self.roundTrip({b'a':b''})
+        self.roundTrip(r'ü'.decode('utf-8')) # works for python 2.7, 3.0, and 3.2+
+        self.roundTrip('u'.decode('utf-8'), expected='u')
     
     def testLargeDict(self):
-        d = {}
-        for i in range(0, 1000):
-            d['%d' % i] = '%d' % i
+        d = dict((str(x), str(x)) for x in xrange(0, 1000))
         self.roundTrip(d)
         
     def testBools(self):
