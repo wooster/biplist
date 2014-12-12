@@ -1,41 +1,41 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import datetime, os, sys, unittest
+
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from biplist import *
-import datetime
-import os
-from test_utils import *
-import unittest
+
+dataPath = os.path.join(os.path.dirname(__file__), 'data')
 
 try:
     unicode
-    toUnicode = lambda x: x.decode('unicode-escape')
+    unicodeStr = lambda x: x.decode('utf-8')
 except NameError:
     unicode = str
-    toUnicode = lambda x: x
+    unicodeStr = lambda x: x
 
 class TestValidPlistFile(unittest.TestCase):
-    def setUp(self):
-        pass
     
     def validateSimpleBinaryRoot(self, root):
         self.assertTrue(type(root) == dict, "Root should be dictionary.")
-        self.assertTrue(type(root[b'dateItem']) == datetime.datetime, "date should be datetime")
-        us = root[b'dateItem'].microsecond
+        self.assertTrue(type(root['dateItem']) == datetime.datetime, "date should be datetime")
+        us = root['dateItem'].microsecond
         if us == 385448:
             # Python 3 doesn't round microseconds to the nearest value.
-            self.assertEqual(root[b'dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385448), "dates not equal" )
+            self.assertEqual(root['dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385448), "dates not equal" )
         else:
-            self.assertEqual(root[b'dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
-        self.assertEqual(root[b'numberItem'], -10000000000000000, "number not of expected value")
-        self.assertEqual(root[b'unicodeItem'], toUnicode('abc\u212cdef\u2133'))
-        self.assertEqual(root[b'stringItem'], b'Hi there')
-        self.assertEqual(root[b'realItem'], 0.47)
-        self.assertEqual(root[b'boolItem'], True)
-        self.assertEqual(root[b'arrayItem'], [b'item0'])
+            self.assertEqual(root['dateItem'], datetime.datetime(2010, 8, 19, 22, 27, 30, 385449), "dates not equal" )
+        self.assertEqual(root['numberItem'], -10000000000000000, "number not of expected value")
+        self.assertEqual(root['unicodeItem'], unicodeStr('abcℬdefℳ'))
+        self.assertEqual(root['stringItem'], 'Hi there')
+        self.assertEqual(root['realItem'], 0.47)
+        self.assertEqual(root['boolItem'], True)
+        self.assertEqual(root['arrayItem'], ['item0'])
         
     def testFileRead(self):
         try:
-            result = readPlist(data_path('simple_binary.plist'))
+            result = readPlist(os.path.join(dataPath, 'simple_binary.plist'))
             self.validateSimpleBinaryRoot(result)
         except NotBinaryPlistException as e:
             self.fail("NotBinaryPlistException: %s" % e)
@@ -43,8 +43,8 @@ class TestValidPlistFile(unittest.TestCase):
             self.fail("InvalidPlistException: %s" % e)
     
     def testUnicodeRoot(self):
-        result = readPlist(data_path('unicode_root.plist'))
-        self.assertEqual(result, toUnicode("Mirror's Edge\u2122 for iPad"))
+        result = readPlist(os.path.join(dataPath, 'unicode_root.plist'))
+        self.assertEqual(result, unicodeStr("Mirror's Edge™ for iPad"))
     
     def testEmptyUnicodeRoot(self):
         # Porting note: this test was tricky; it was only passing in
@@ -54,21 +54,21 @@ class TestValidPlistFile(unittest.TestCase):
         # test, the value in unicode_empty.plist has the format byte
         # 0b0101 (ASCII string), so the value being asserted against
         # appears to be what is wrong.
-        result = readPlist(data_path('unicode_empty.plist'))
-        self.assertEqual(result, b'')
+        result = readPlist(os.path.join(dataPath, 'unicode_empty.plist'))
+        self.assertEqual(result, '')
     
     def testSmallReal(self):
-        result = readPlist(data_path('small_real.plist'))
-        self.assertEqual(result, {b'4 byte real':0.5})
+        result = readPlist(os.path.join(dataPath, 'small_real.plist'))
+        self.assertEqual(result, {'4 byte real':0.5})
     
     def testLargeIntegers(self):
-        result = readPlist(data_path('large_int_limits.plist'))
-        self.assertEqual(result[b'Max 8 Byte Unsigned Integer'], 18446744073709551615)
-        self.assertEqual(result[b'Min 8 Byte Signed Integer'], -9223372036854775808)
-        self.assertEqual(result[b'Max 8 Byte Signed Integer'], 9223372036854775807)
+        result = readPlist(os.path.join(dataPath, 'large_int_limits.plist'))
+        self.assertEqual(result['Max 8 Byte Unsigned Integer'], 18446744073709551615)
+        self.assertEqual(result['Min 8 Byte Signed Integer'], -9223372036854775808)
+        self.assertEqual(result['Max 8 Byte Signed Integer'], 9223372036854775807)
     
     def testLargeDates(self):
-        result = readPlist(data_path("BFPersistentEventInfo.plist"))
+        result = readPlist(os.path.join(dataPath, "BFPersistentEventInfo.plist"))
         self.assertEqual(result['lastShownRatePromptDate'], datetime.datetime(1, 12, 30, 0, 0, 0))
 
     def testKeyedArchiverPlist(self):
@@ -85,15 +85,19 @@ class TestValidPlistFile(unittest.TestCase):
         NSData *data = [NSKeyedArchiver archivedDataWithRootObject:test]
         ...
         """
-        result = readPlist(data_path('nskeyedarchiver_example.plist'))
-        self.assertEqual(result, {b'$version': 100000, 
-            b'$objects': 
-                [b'$null',
-                 {b'$class': Uid(3), b'somekey': Uid(2)}, 
-                 b'object value as string',
-                 {b'$classes': [b'Archived', b'NSObject'], b'$classname': b'Archived'}
-                 ], 
-            b'$top': {b'root': Uid(1)}, b'$archiver': b'NSKeyedArchiver'})
+        result = readPlist(os.path.join(dataPath, 'nskeyedarchiver_example.plist'))
+        self.assertEqual(result, {
+        	'$version': 100000, 
+            '$objects':
+                [
+                	'$null',
+                 	{'$class':Uid(3), 'somekey':Uid(2)}, 
+                 	'object value as string',
+                 	{'$classes':['Archived', 'NSObject'], '$classname':'Archived'}
+                ],
+			'$top': {'root':Uid(1)},
+			'$archiver':'NSKeyedArchiver'
+        })
         self.assertEqual("Uid(1)", repr(Uid(1)))
     
 if __name__ == '__main__':

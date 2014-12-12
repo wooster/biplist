@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """biplist -- a library for reading and writing binary property list files.
 
 Binary Property List (plist) files provide a faster and smaller serialization
@@ -44,13 +46,14 @@ Plist parsing example:
         print "Not a plist:", e
 """
 
-import sys
-from collections import namedtuple
+from __future__ import division
+
+import collections
 import datetime
 import io
 import math
 import plistlib
-from struct import pack, unpack
+from struct import pack, unpack, unpack_from
 from struct import error as struct_error
 import sys
 import time
@@ -193,8 +196,8 @@ def is_stream_binary_plist(stream):
     else:
         return False
 
-PlistTrailer = namedtuple('PlistTrailer', 'offsetSize, objectRefSize, offsetCount, topLevelObjectNumber, offsetTableOffset')
-PlistByteCounts = namedtuple('PlistByteCounts', 'nullBytes, boolBytes, intBytes, realBytes, dateBytes, dataBytes, stringBytes, uidBytes, arrayBytes, setBytes, dictBytes')
+PlistTrailer = collections.namedtuple('PlistTrailer', 'offsetSize, objectRefSize, offsetCount, topLevelObjectNumber, offsetTableOffset')
+PlistByteCounts = collections.namedtuple('PlistByteCounts', 'nullBytes, boolBytes, intBytes, realBytes, dateBytes, dataBytes, stringBytes, uidBytes, arrayBytes, setBytes, dictBytes')
 
 class PlistReader(object):
     file = None
@@ -376,7 +379,7 @@ class PlistReader(object):
     def readAsciiString(self, length):
         result = unpack("!%ds" % length, self.contents[self.currentOffset:self.currentOffset+length])[0]
         self.currentOffset += length
-        return result
+        return str(result.decode('ascii'))
     
     def readUnicode(self, length):
         actual_length = length*2
@@ -423,7 +426,9 @@ class PlistReader(object):
                 result = int.from_bytes(data, 'big')
             else:
                 for byte in data:
-                    result = (result << 8) | unpack('>B', byte)[0]
+                    if not isinstance(byte, int): # Python3.0-3.1.x return ints, 2.x return str
+                        byte = unpack_from('>B', byte)[0]
+                    result = (result << 8) | byte
         else:
             raise InvalidPlistException("Encountered integer longer than 16 bytes.")
         return result
@@ -546,8 +551,7 @@ class PlistWriter(object):
         """
         output = self.header
         wrapped_root = self.wrapRoot(root)
-        should_reference_root = True#not isinstance(wrapped_root, HashableWrapper)
-        self.computeOffsets(wrapped_root, asReference=should_reference_root, isRoot=True)
+        self.computeOffsets(wrapped_root, asReference=True, isRoot=True)
         self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(len(self.computedUniques))})
         self.writeObjectReference(wrapped_root, output)
         output = self.writeObject(wrapped_root, output, setReferencePosition=True)
@@ -593,6 +597,8 @@ class PlistWriter(object):
             return HashableWrapper(n)
         elif isinstance(root, (str, unicode)) and not isinstance(root, Data):
             return StringWrapper(root)
+        elif isinstance(root, bytes):
+            return Data(root)
         else:
             return root
 
@@ -662,7 +668,7 @@ class PlistWriter(object):
                     self.computeOffsets(key, asReference=True)
                     self.computeOffsets(value, asReference=True)
         else:
-            raise InvalidPlistException("Unknown object type.")
+            raise InvalidPlistException("Unknown object type: %s (%s)" % (type(obj).__name__, repr(obj)))
 
     def writeObjectReference(self, obj, output):
         """Tries to write an object reference, adding it to the references
@@ -694,10 +700,6 @@ class PlistWriter(object):
                 result += pack('!B', (format << 4) | length)
             return result
         
-        if isinstance(obj, (str, unicode)) and obj == unicodeEmpty:
-            # The Apple Plist decoder can't decode a zero length Unicode string.
-            obj = b''
-       
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
         
@@ -722,7 +724,9 @@ class PlistWriter(object):
             output += pack('!B', (0b0010 << 4) | 3)
             output += self.binaryReal(obj)
         elif isinstance(obj, datetime.datetime):
-            timestamp = (obj - apple_reference_date).total_seconds()
+            timeDelta = obj - apple_reference_date
+            timestamp = (timeDelta.microseconds + (timeDelta.seconds + timeDelta.days * 24 * 3600) * 10**6) / 10**6
+            # this is the calculation for timedelta.total_seconds(), per the Python docs
             output += pack('!B', 0b00110011)
             output += pack('!d', float(timestamp))
         elif isinstance(obj, Data):
@@ -781,6 +785,7 @@ class PlistWriter(object):
             # because u'' and b'' have the same hash; but it is in
             # Py3, where they don't.
             if bytes != str and obj == unicodeEmpty:
+                print('got here')
                 obj = b''
             position = self.referencePositions.get(obj)
             if position is None:

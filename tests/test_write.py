@@ -1,46 +1,99 @@
 #!/usr/local/env python
 # -*- coding: utf-8 -*-
 
+import datetime, io, os, subprocess, sys, tempfile, unittest
+
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from biplist import *
 from biplist import PlistWriter
-import datetime
-import io
-import os
-import subprocess
-import tempfile
-from test_utils import *
-import unittest
 
 try:
     unicode
+    unicodeStr = lambda x: x.decode('utf-8')
 except NameError:
     unicode = str
+    unicodeStr = lambda x: x
 try:
     xrange
 except NameError:
     xrange = range
 
+def run_command(args, verbose=False):
+    """Runs the command and returns the status and the output."""
+    if verbose:
+        sys.stderr.write("Running: %s\n" % command)
+    process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    
+    if verbose and stderr:
+       sys.stderr.write("Error output:\n%s\n\n" % stderr.decode('utf-8')) 
+    
+    return process.returncode, stdout.decode('utf-8').strip('\n')
 
 class TestWritePlist(unittest.TestCase):
-    def setUp(self):
-        pass
     
-    def roundTrip(self, root, xml=False, expected=None):
-        # 'expected' is more fallout from the
-        # don't-write-empty-unicode-strings issue.
-        plist = writePlistToString(root, binary=(not xml))
+    def roundTrip(self, case, xml=False, expected=None, reprTest=True):
+        
+        # -- convert to plist string
+        
+        plist = writePlistToString(case, binary=(not xml))
         self.assertTrue(len(plist) > 0)
+        
+        # -- confirm that lint is happy with the result
+        
+        self.lintPlist(plist)        
+        
+        # -- convert back
+        
         readResult = readPlistFromString(plist)
-        self.assertEqual(readResult, (expected if expected is not None else root))
-        self.lintPlist(plist)
+        
+        # -- test equality
+        
+        if reprTest is True:
+            self.assertEqual(repr(case if expected is None else expected), repr(readResult))
+        else:
+            self.assertEqual((case if expected is None else expected), readResult)
+        
+        # -- write to file
+        
+        plistFile = tempfile.NamedTemporaryFile(mode='wb+', suffix='.plist')
+        writePlist(case, plistFile, binary=(xml is False))
+        plistFile.seek(0)
+        
+        # -- confirm that lint is happy with the result
+        
+        self.lintPlist(plistFile)
+        
+        # -- read back from file
+        
+        fileResult = readPlist(plistFile)
+        
+        # -- test equality
+        
+        if reprTest is True:
+            self.assertEqual(repr(case if expected is None else expected), repr(fileResult))
+        else:
+            self.assertEqual((case if expected is None else expected), fileResult)
     
-    def lintPlist(self, plistString):
-        if os.path.exists('/usr/bin/plutil'):
-            f = tempfile.NamedTemporaryFile()
-            f.write(plistString)
-            f.flush()
-            name = f.name
-            (status, output) = run_command(['/usr/bin/plutil', '-lint', name])
+    def lintPlist(self, plist):
+        if os.access('/usr/bin/plutil', os.X_OK):
+            
+            plistFile = None
+            plistFilePath = None
+            
+            if hasattr(plist, 'name'):
+                plistFilePath = plist.name
+            else:
+                if hasattr(plist, 'read'):
+                    plistFile = tempfile.NamedTemporaryFile('w%s' % ('b' if 'b' in plist.mode else ''))
+                    plistFile.write(plist.read())
+                else:
+                    plistFile = tempfile.NamedTemporaryFile('w%s' % ('b' if isinstance(plist, bytes) else ''))
+                    plistFile.write(plist)
+                plistFilePath = plistFile.name
+                plistFile.flush()
+
+            status, output = run_command(['/usr/bin/plutil', '-lint', plistFilePath])
             if status != 0:
                 self.fail("plutil verification failed (status %d): %s" % (status, output))
     
@@ -80,21 +133,17 @@ class TestWritePlist(unittest.TestCase):
             self.assertTrue(cases[i] == result[i])
             self.assertEqual(type(cases[i]), type(result[i]), "Type mismatch on %d: %s != %s" % (i, repr(cases[i]), repr(result[i])))
     
-    def reprChecker(self, case):
-        result = readPlistFromString(writePlistToString(case))
-        self.assertEqual(repr(case), repr(result))
-    
     def testBoolsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, True, False, None])
         self.mixedNumericTypesHelper([False, True, 0, 1, None])
-        self.reprChecker({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
-        self.reprChecker([1, 1, 1, 1, 1, True, True, True, True])
+        self.roundTrip({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
+        self.roundTrip([1, 1, 1, 1, 1, True, True, True, True])
     
     def testFloatsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, 1.0, 0.0, None])
         self.mixedNumericTypesHelper([0.0, 1.0, 0, 1, None])
-        self.reprChecker({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]})
-        self.reprChecker([1, 1, 1, 1, 1, 1.0, 1.0, 1.0, 1.0])
+        self.roundTrip({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]})
+        self.roundTrip([1, 1, 1, 1, 1, 1.0, 1.0, 1.0, 1.0])
     
     def testSetRoot(self):
         self.roundTrip(set((1, 2, 3)))
@@ -119,36 +168,130 @@ class TestWritePlist(unittest.TestCase):
         self.lintPlist(writePlistToString(root))
         self.roundTrip(root)
     
-    def testString(self):
+    def testBytes(self):
+        
+        # -- as root
+        
         self.roundTrip(b'0')
         self.roundTrip(b'')
-        self.roundTrip({b'a':b''})
-        self.roundTrip(r'ü'.decode('utf-8')) # works for python 2.7, 3.0, and 3.2+
-        self.roundTrip('u'.decode('utf-8'), expected='u')
-    
-    def testLargeDict(self):
-        d = dict((str(x), str(x)) for x in xrange(0, 1000))
-        self.roundTrip(d)
         
-    def testBools(self):
-        self.roundTrip([True, False])
+        # -- as value
+        
+        self.roundTrip([b'0'])
+        self.roundTrip([b''])
+        
+        # - dict
+        
+        self.roundTrip({'a': b'0'})
+        self.roundTrip({'a': b''})
     
-    def testUniques(self):
-        root = {'hi':'there', 'halloo':'there'}
-        self.roundTrip(root)
+    def testString(self):
+        
+        # -- as root
+        
+        self.roundTrip('')
+        self.roundTrip('a')
+        self.roundTrip('1')
+        
+        # -- as value
+        
+        # - array
+        
+        self.roundTrip([''])
+        self.roundTrip(['a'])
+        self.roundTrip(['1'])
+        
+        # - dict
+        
+        self.roundTrip({'a':''})
+        self.roundTrip({'a':'a'})
+        self.roundTrip({'1':'a'})
+        
+        # -- as key
+        
+        self.roundTrip({'a':'a'})
+        self.roundTrip({'a':'1'})
     
-    def testWriteToFile(self):
-        for is_binary in [True, False]:
-            path = '/var/tmp/test.plist'
-            writePlist([1, 2, 3], path, binary=is_binary)
-            self.assertTrue(os.path.exists(path))
-            with open(path, 'rb') as f:
-                self.lintPlist(f.read())
+    def testUnicode(self):
+        
+        # -- defaulting to 1 byte strings
+        
+        if str != unicode:
+            self.roundTrip(unicodeStr(r''), expected='')
+            self.roundTrip(unicodeStr(r'a'), expected='a')
+            
+            self.roundTrip([unicodeStr(r'a')], expected=['a'])
+            
+            self.roundTrip({'a':unicodeStr(r'a')}, expected={'a':'a'})
+            self.roundTrip({unicodeStr(r'a'):'a'}, expected={'a':'a'})
+        
+        # -- as root
+        
+        self.roundTrip(unicodeStr(r'ü'))
+        # ToDo: need a 4-byte unicode character
+        
+        # -- as value
+        
+        # - array
+        
+        self.roundTrip([unicodeStr(r'ü')])
+        
+        # - dict
+        
+        self.roundTrip({'a':unicodeStr(r'ü')})
+        
+        # -- as key
+        
+        self.roundTrip({unicodeStr(r'ü'):'a'})
     
     def testNone(self):
         self.roundTrip(None)
         self.roundTrip({'1':None})
         self.roundTrip([None, None, None])
+    
+    def testBools(self):
+        
+        # -- as root
+        
+        self.roundTrip(True)
+        self.roundTrip(False)
+        
+        # -- as value
+        
+        # - array
+        
+        self.roundTrip([True, False])
+        
+        # - dict
+        
+        self.roundTrip({'a':True, 'b':False})
+    
+    def testUniques(self):
+        root = {'hi':'there', 'halloo':'there'}
+        self.roundTrip(root)
+    
+    def testAllEmpties(self):
+        '''Primarily testint that an empty unicode and bytes are not mixed up'''
+        self.roundTrip([unicodeStr(''), '', b'', [], {}], expected=['', '', b'', [], {}])
+    
+    def testLargeDict(self):
+        d = dict((str(x), str(x)) for x in xrange(0, 1000))
+        self.roundTrip(d, reprTest=False)
+        
+    def testWriteToFile(self):
+        for is_binary in [True, False]:
+            with tempfile.NamedTemporaryFile(mode='w%s' % ('b' if is_binary else ''), suffix='.plist') as plistFile:
+                # clear out the created file
+                os.unlink(plistFile.name)
+                self.assertFalse(os.path.exists(plistFile.name))
+                
+                # write to disk
+                writePlist([1, 2, 3], plistFile.name, binary=is_binary)
+                self.assertTrue(os.path.exists(plistFile.name))
+                
+                with open(plistFile.name, 'r%s' % ('b' if is_binary else '')) as f:
+                    fileContents = f.read()
+                    self.lintPlist(fileContents)
     
     def testBadKeys(self):
         try:
@@ -176,7 +319,7 @@ class TestWritePlist(unittest.TestCase):
                  -pow(2, 15), pow(2, 15) - 1, 
                  -pow(2, 31), pow(2, 31) - 1, 
                  -pow(2, 63), pow(2, 64) - 1]
-        self.roundTrip(edges)
+        self.roundTrip(edges, reprTest=False)
         
         ioBytes = io.BytesIO()
         writer = PlistWriter(ioBytes)
@@ -192,7 +335,7 @@ class TestWritePlist(unittest.TestCase):
                 self.assertEqual(bytelen, got, "Byte size is wrong. Expected %d, got %d" % (bytelen, got))
         
         bytes_lists = [list(x) for x in bytes]
-        self.roundTrip(bytes_lists)
+        self.roundTrip(bytes_lists, reprTest=False)
         
         try:
             self.roundTrip([0x10000000000000000, pow(2, 64)])
@@ -203,15 +346,6 @@ class TestWritePlist(unittest.TestCase):
     def testWriteData(self):
         self.roundTrip(Data(b"woohoo"))
         
-    def testUnicode(self):
-        unicodeRoot = unicode("Mirror's Edge\u2122 for iPad")
-        writePlist(unicodeRoot, "/tmp/odd.plist")
-        self.roundTrip(unicodeRoot)
-        unicodeStrings = [unicode("Mirror's Edge\u2122 for iPad"), unicode('Weightbot \u2014 Track your Weight in Style')]
-        self.roundTrip(unicodeStrings)
-        self.roundTrip({unicode(""):unicode("")}, expected={b'':b''})
-        self.roundTrip(unicode(""), expected=b'')
-        
     def testUidWrite(self):
         self.roundTrip({'$version': 100000, 
             '$objects': 
@@ -220,7 +354,7 @@ class TestWritePlist(unittest.TestCase):
                  'object value as string', 
                  {'$classes': ['Archived', 'NSObject'], '$classname': 'Archived'}
                  ], 
-            '$top': {'root': Uid(1)}, '$archiver': 'NSKeyedArchiver'})
+            '$top': {'root': Uid(1)}, '$archiver': 'NSKeyedArchiver'}, reprTest=False)
 
 if __name__ == '__main__':
     unittest.main()
