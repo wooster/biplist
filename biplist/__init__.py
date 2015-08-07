@@ -653,7 +653,7 @@ class PlistWriter(object):
                 result += pack('!B', (format << 4) | length)
             return result
         
-        if isinstance(obj, (str, unicode)) and obj == unicodeEmpty:
+        if isinstance(obj, (str, unicode)) and not isinstance(obj, Data) and obj == unicodeEmpty:
             # The Apple Plist decoder can't decode a zero length Unicode string.
             obj = b''
        
