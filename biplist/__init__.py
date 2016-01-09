@@ -78,11 +78,32 @@ __all__ = [
 # Apple uses Jan 1, 2001 as a base for all plist date/times.
 apple_reference_date = datetime.datetime.utcfromtimestamp(978307200)
 
-class Uid(int):
+class Uid(object):
     """Wrapper around integers for representing UID values. This
        is used in keyed archiving."""
+    integer = 0
+    def __init__(self, integer):
+        self.integer = integer
+    
     def __repr__(self):
-        return "Uid(%d)" % self
+        return "Uid(%d)" % self.integer
+    
+    def __eq__(self, other):
+        if isinstance(self, Uid) and isinstance(other, Uid):
+            return self.integer == other.integer
+        return False
+    
+    def __cmp__(self, other):
+        return self.integer - other.integer
+    
+    def __lt__(self, other):
+        return self.integer < other.integer
+    
+    def __hash__(self):
+        return self.integer
+    
+    def __int__(self):
+        return int(self.integer)
 
 class Data(bytes):
     """Wrapper around bytes to distinguish Data values."""
@@ -627,7 +648,7 @@ class PlistWriter(object):
         elif isinstance(obj, BoolWrapper):
             self.incrementByteCount('boolBytes')
         elif isinstance(obj, Uid):
-            size = self.intSize(obj)
+            size = self.intSize(obj.integer)
             self.incrementByteCount('uidBytes', incr=1+size)
         elif isinstance(obj, (int, long)):
             size = self.intSize(obj)
@@ -695,11 +716,6 @@ class PlistWriter(object):
             else:
                 result += pack('!B', (format << 4) | length)
             return result
-        
-        def timedelta_total_seconds(td):
-            # Shim for Python 2.6 compatibility, which doesn't have total_seconds.
-            # Make one argument a float to ensure the right calculation.
-            return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10.0**6) / 10.0**6
        
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
@@ -712,9 +728,9 @@ class PlistWriter(object):
             else:
                 output += pack('!B', 0b00001001)
         elif isinstance(obj, Uid):
-            size = self.intSize(obj)
+            size = self.intSize(obj.integer)
             output += pack('!B', (0b1000 << 4) | size - 1)
-            output += self.binaryInt(obj)
+            output += self.binaryInt(obj.integer)
         elif isinstance(obj, (int, long)):
             byteSize = self.intSize(obj)
             root = math.log(byteSize, 2)
@@ -725,10 +741,7 @@ class PlistWriter(object):
             output += pack('!B', (0b0010 << 4) | 3)
             output += self.binaryReal(obj)
         elif isinstance(obj, datetime.datetime):
-            try:
-                timestamp = (obj - apple_reference_date).total_seconds()
-            except AttributeError:
-                timestamp = timedelta_total_seconds(obj - apple_reference_date)
+            timestamp = (obj - apple_reference_date).total_seconds()
             output += pack('!B', 0b00110011)
             output += pack('!d', float(timestamp))
         elif isinstance(obj, Data):

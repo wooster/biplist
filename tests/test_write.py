@@ -320,6 +320,13 @@ class TestWritePlist(unittest.TestCase):
                  {'$classes': ['Archived', 'NSObject'], '$classname': 'Archived'}
                  ], 
             '$top': {'root': Uid(1)}, '$archiver': 'NSKeyedArchiver'}, reprTest=False)
+    
+    def testUidRoundTrip(self):
+        # Per https://github.com/wooster/biplist/issues/9
+        self.roundTrip(Uid(1))
+        self.roundTrip([Uid(1), 1])
+        self.roundTrip([1, Uid(1)])
+        self.roundTrip([Uid(1), Uid(1)])
 
 if __name__ == '__main__':
     unittest.main()

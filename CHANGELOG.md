@@ -1,3 +1,12 @@
+2016-01-09 wooster v1.0.0
+-------------------------
+
+This release changes the type of `Uid` from a subclass of `int` to a subclass of `object`.
+
+This change was made to address GitHub issue [\#9 Ints are being turned into Uids and vice versa when both are present in a plist.](https://github.com/wooster/biplist/issues/9)
+
+This release also bumps the minimum supported Python versions to 2.7 and 3.4.
+
 2016-01-09 wooster v0.9.1
 -------------------------
 

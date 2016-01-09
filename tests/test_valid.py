@@ -87,7 +87,7 @@ class TestValidPlistFile(unittest.TestCase):
         """
         result = readPlist(data_path('nskeyedarchiver_example.plist'))
         self.assertEqual(result, {
-        	'$version': 100000, 
+            '$version': 100000, 
             '$objects':
                 [
                 	'$null',
@@ -95,10 +95,22 @@ class TestValidPlistFile(unittest.TestCase):
                  	'object value as string',
                  	{'$classes':['Archived', 'NSObject'], '$classname':'Archived'}
                 ],
-			'$top': {'root':Uid(1)},
-			'$archiver':'NSKeyedArchiver'
+            '$top': {'root':Uid(1)},
+            '$archiver':'NSKeyedArchiver'
         })
         self.assertEqual("Uid(1)", repr(Uid(1)))
+    
+    def testUidComparisons(self):
+        self.assertTrue(Uid(-2) < Uid(-1))
+        self.assertTrue(Uid(-1) < Uid(0))
+        self.assertTrue(Uid(1) > Uid(0))
+        self.assertTrue(Uid(1) > Uid(-2))
+        self.assertTrue(Uid(-1) == Uid(-1))
+        self.assertTrue(Uid(0) == Uid(0))
+        self.assertTrue(Uid(1) == Uid(1))
+        
+        self.assertFalse(1 == Uid(1))
+        self.assertFalse(Uid(0) == 0)
     
 if __name__ == '__main__':
     unittest.main()

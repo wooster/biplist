@@ -12,14 +12,14 @@ import sys
 
 major, minor, micro, releaselevel, serial = sys.version_info
 
-if major <= 1 or (major == 2 and minor < 6) or (major == 3 and minor < 2):
+if major <= 1 or (major == 2 and minor < 7) or (major == 3 and minor < 4):
     # N.B.: Haven't tested with older py3k versions.
-    print('This module supports Python 2 >= 2.6 and Python 3 >= 3.2.')
+    print('This module supports Python 2 >= 2.7 and Python 3 >= 3.4.')
     sys.exit(1)
 
 author = 'Andrew Wooster'
 email = 'andrew@planetaryscale.com'
-version = '0.9.1'
+version = '1.0.0'
 desc = 'biplist is a library for reading/writing binary plists.'
 
 setup(
@@ -36,7 +36,7 @@ Binary Property List (plist) files provide a faster and smaller serialization
 format for property lists on OS X. This is a library for generating binary
 plists which can be read by OS X, iOS, or other clients.
 
-This module requires Python 2.6 or higher or Python 3.2 or higher.""",
+This module requires Python 2.7 or higher or Python 3.4 or higher.""",
     author = author,
     author_email = email,
     packages = find_packages(),
