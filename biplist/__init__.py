@@ -44,13 +44,12 @@ Plist parsing example:
         print "Not a plist:", e
 """
 
-import sys
 from collections import namedtuple
 import datetime
 import io
 import math
 import plistlib
-from struct import pack, unpack
+from struct import pack, unpack, unpack_from
 from struct import error as struct_error
 import sys
 import time
@@ -86,16 +85,13 @@ class Uid(int):
         return "Uid(%d)" % self
 
 class Data(bytes):
-    """Wrapper around str types for representing Data values."""
-    pass
+    """Wrapper around bytes to distinguish Data values."""
 
 class InvalidPlistException(Exception):
     """Raised when the plist is incorrectly formatted."""
-    pass
 
 class NotBinaryPlistException(Exception):
     """Raised when a binary plist was expected but not encountered."""
-    pass
 
 def readPlist(pathOrFile):
     """Raises NotBinaryPlistException, InvalidPlistException"""
@@ -379,7 +375,7 @@ class PlistReader(object):
     def readAsciiString(self, length):
         result = unpack("!%ds" % length, self.contents[self.currentOffset:self.currentOffset+length])[0]
         self.currentOffset += length
-        return result
+        return str(result.decode('ascii'))
     
     def readUnicode(self, length):
         actual_length = length*2
@@ -426,7 +422,9 @@ class PlistReader(object):
                 result = int.from_bytes(data, 'big')
             else:
                 for byte in data:
-                    result = (result << 8) | unpack('>B', byte)[0]
+                    if not isinstance(byte, int): # Python3.0-3.1.x return ints, 2.x return str
+                        byte = unpack_from('>B', byte)[0]
+                    result = (result << 8) | byte
         else:
             raise InvalidPlistException("Encountered integer longer than 16 bytes.")
         return result
@@ -455,6 +453,48 @@ class FloatWrapper(object):
         return wrapper
     def __repr__(self):
         return "<FloatWrapper: %s>" % self.value
+
+class StringWrapper(object):
+    __instances = {}
+    
+    encodedValue = None
+    encoding = None
+    
+    def __new__(cls, value):
+        '''Ensure we only have a only one instance for any string,
+         and that we encode ascii as 1-byte-per character when possible'''
+        
+        encodedValue = None
+        
+        for encoding in ('ascii', 'utf_16_be'):
+            try:
+               encodedValue = value.encode(encoding)
+            except: pass
+            if encodedValue is not None:
+                if encodedValue not in cls.__instances:
+                    cls.__instances[encodedValue] = super(StringWrapper, cls).__new__(cls)
+                    cls.__instances[encodedValue].encodedValue = encodedValue
+                    cls.__instances[encodedValue].encoding = encoding
+                return cls.__instances[encodedValue]
+        
+        raise ValueError('Unable to get ascii or utf_16_be encoding for %s' % repr(value))
+    
+    def __len__(self):
+        '''Return roughly the number of characters in this string (half the byte length)'''
+        if self.encoding == 'ascii':
+            return len(self.encodedValue)
+        else:
+            return len(self.encodedValue)//2
+    
+    @property
+    def encodingMarker(self):
+        if self.encoding == 'ascii':
+            return 0b0101
+        else:
+            return 0b0110
+    
+    def __repr__(self):
+        return '<StringWrapper (%s): %s>' % (self.encoding, self.encodedValue)
 
 class PlistWriter(object):
     header = b'bplist00bybiplist1.0'
@@ -507,10 +547,9 @@ class PlistWriter(object):
         """
         output = self.header
         wrapped_root = self.wrapRoot(root)
-        should_reference_root = True#not isinstance(wrapped_root, HashableWrapper)
-        self.computeOffsets(wrapped_root, asReference=should_reference_root, isRoot=True)
+        self.computeOffsets(wrapped_root, asReference=True, isRoot=True)
         self.trailer = self.trailer._replace(**{'objectRefSize':self.intSize(len(self.computedUniques))})
-        (_, output) = self.writeObjectReference(wrapped_root, output)
+        self.writeObjectReference(wrapped_root, output)
         output = self.writeObject(wrapped_root, output, setReferencePosition=True)
         
         # output size at this point is an upper bound on how big the
@@ -552,6 +591,10 @@ class PlistWriter(object):
         elif isinstance(root, tuple):
             n = tuple([self.wrapRoot(value) for value in root])
             return HashableWrapper(n)
+        elif isinstance(root, (str, unicode)) and not isinstance(root, Data):
+            return StringWrapper(root)
+        elif isinstance(root, bytes):
+            return Data(root)
         else:
             return root
 
@@ -564,7 +607,7 @@ class PlistWriter(object):
                 raise InvalidPlistException('Dictionary keys cannot be null in plists.')
             elif isinstance(key, Data):
                 raise InvalidPlistException('Data cannot be dictionary keys in plists.')
-            elif not isinstance(key, (bytes, unicode)):
+            elif not isinstance(key, StringWrapper):
                 raise InvalidPlistException('Keys must be strings.')
         
         def proc_size(size):
@@ -597,7 +640,7 @@ class PlistWriter(object):
         elif isinstance(obj, Data):
             size = proc_size(len(obj))
             self.incrementByteCount('dataBytes', incr=1+size)
-        elif isinstance(obj, (unicode, bytes)):
+        elif isinstance(obj, StringWrapper):
             size = proc_size(len(obj))
             self.incrementByteCount('stringBytes', incr=1+size)
         elif isinstance(obj, HashableWrapper):
@@ -621,7 +664,7 @@ class PlistWriter(object):
                     self.computeOffsets(key, asReference=True)
                     self.computeOffsets(value, asReference=True)
         else:
-            raise InvalidPlistException("Unknown object type.")
+            raise InvalidPlistException("Unknown object type: %s (%s)" % (type(obj).__name__, repr(obj)))
 
     def writeObjectReference(self, obj, output):
         """Tries to write an object reference, adding it to the references
@@ -658,9 +701,9 @@ class PlistWriter(object):
             # Make one argument a float to ensure the right calculation.
             return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10.0**6) / 10.0**6
         
-        if isinstance(obj, (str, unicode)) and not isinstance(obj, Data) and obj == unicodeEmpty:
-            # The Apple Plist decoder can't decode a zero length Unicode string.
-            obj = b''
+        #!!if isinstance(obj, (str, unicode)) and not isinstance(obj, Data) and obj == unicodeEmpty:
+        #!!    # The Apple Plist decoder can't decode a zero length Unicode string.
+        #!!    obj = b''
        
         if setReferencePosition:
             self.referencePositions[obj] = len(output)
@@ -695,10 +738,9 @@ class PlistWriter(object):
         elif isinstance(obj, Data):
             output += proc_variable_length(0b0100, len(obj))
             output += obj
-        elif isinstance(obj, unicode):
-            byteData = obj.encode('utf_16_be')
-            output += proc_variable_length(0b0110, len(byteData)//2)
-            output += byteData
+        elif isinstance(obj, StringWrapper):
+            output += proc_variable_length(obj.encodingMarker, len(obj))
+            output += obj.encodedValue
         elif isinstance(obj, bytes):
             output += proc_variable_length(0b0101, len(obj))
             output += obj
