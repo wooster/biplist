@@ -1,9 +1,11 @@
-2016-01-08 wooster v0.9.1
+2016-01-09 wooster v0.9.1
 -------------------------
 
 Fixes GitHub issue [\#8 ERROR: testLargeDates (test_valid.TestValidPlistFile)](https://github.com/wooster/biplist/issues/8)
 
 Fixes [\#6 Empty Data object converted as empty string](https://bitbucket.org/wooster/biplist/issues/6/empty-data-object-converted-as-empty)
+
+Creates 1-byte strings when possible, per [PR \#4](https://bitbucket.org/wooster/biplist/pull-requests/4/create-1-byte-strings-when-possible-and/diff)
 
 2014-10-26 wooster v0.9
 -----------------------
