@@ -1,18 +1,14 @@
-#!/usr/bin/env python
-
-import os, sys, unittest
-
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from biplist import *
-
-dataPath = os.path.join(os.path.dirname(__file__), 'data')
+import os
+from test_utils import *
+import unittest
 
 class TestInvalidPlistFile(unittest.TestCase):
     def setUp(self):
         pass
     def testEmptyFile(self):
         try:
-            readPlist(os.path.join(dataPath, 'empty_file.plist'))
+            readPlist(data_path('empty_file.plist'))
             self.fail("Should not successfully read empty plist.")
         except NotBinaryPlistException as e:
             pass

@@ -3,73 +3,57 @@
 
 import datetime, io, os, subprocess, sys, tempfile, unittest
 
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from biplist import *
 from biplist import PlistWriter
+from test_utils import *
 
 try:
     unicode
     unicodeStr = lambda x: x.decode('utf-8')
+    toUnicode = lambda x: x.decode('unicode-escape')
 except NameError:
     unicode = str
     unicodeStr = lambda x: x
+    toUnicode = lambda x: x
 try:
     xrange
 except NameError:
     xrange = range
 
-def run_command(args, verbose=False):
-    """Runs the command and returns the status and the output."""
-    if verbose:
-        sys.stderr.write("Running: %s\n" % command)
-    process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    stdout, stderr = process.communicate()
-    
-    if verbose and stderr:
-       sys.stderr.write("Error output:\n%s\n\n" % stderr.decode('utf-8')) 
-    
-    return process.returncode, stdout.decode('utf-8').strip('\n')
-
 class TestWritePlist(unittest.TestCase):
     
     def roundTrip(self, case, xml=False, expected=None, reprTest=True):
+        # reprTest may fail randomly if True and the values being encoded include a dictionary with more
+        # than one key.
         
-        # -- convert to plist string
-        
+        # convert to plist string
         plist = writePlistToString(case, binary=(not xml))
         self.assertTrue(len(plist) > 0)
         
-        # -- confirm that lint is happy with the result
-        
+        # confirm that lint is happy with the result
         self.lintPlist(plist)        
         
-        # -- convert back
-        
+        # convert back
         readResult = readPlistFromString(plist)
         
-        # -- test equality
-        
+        # test equality
         if reprTest is True:
             self.assertEqual(repr(case if expected is None else expected), repr(readResult))
         else:
             self.assertEqual((case if expected is None else expected), readResult)
         
-        # -- write to file
-        
+        # write to file
         plistFile = tempfile.NamedTemporaryFile(mode='wb+', suffix='.plist')
         writePlist(case, plistFile, binary=(xml is False))
         plistFile.seek(0)
         
-        # -- confirm that lint is happy with the result
-        
+        # confirm that lint is happy with the result
         self.lintPlist(plistFile)
         
-        # -- read back from file
-        
+        # read back from file
         fileResult = readPlist(plistFile)
         
-        # -- test equality
-        
+        # test equality
         if reprTest is True:
             self.assertEqual(repr(case if expected is None else expected), repr(fileResult))
         else:
@@ -77,7 +61,6 @@ class TestWritePlist(unittest.TestCase):
     
     def lintPlist(self, plist):
         if os.access('/usr/bin/plutil', os.X_OK):
-            
             plistFile = None
             plistFilePath = None
             
@@ -125,7 +108,7 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip([1, 2, 3])
     
     def testDictRoot(self):
-        self.roundTrip({'a':1, 'B':'d'})
+        self.roundTrip({'a':1, 'B':'d'}, reprTest=False)
     
     def mixedNumericTypesHelper(self, cases):
         result = readPlistFromString(writePlistToString(cases))
@@ -136,13 +119,13 @@ class TestWritePlist(unittest.TestCase):
     def testBoolsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, True, False, None])
         self.mixedNumericTypesHelper([False, True, 0, 1, None])
-        self.roundTrip({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]})
+        self.roundTrip({'1':[True, False, 1, 0], '0':[1, 2, 0, {'2':[1, 0, False]}]}, reprTest=False)
         self.roundTrip([1, 1, 1, 1, 1, True, True, True, True])
     
     def testFloatsAndIntegersMixed(self):
         self.mixedNumericTypesHelper([0, 1, 1.0, 0.0, None])
         self.mixedNumericTypesHelper([0.0, 1.0, 0, 1, None])
-        self.roundTrip({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]})
+        self.roundTrip({'1':[1.0, 0.0, 1, 0], '0':[1, 2, 0, {'2':[1, 0, 0.0]}]}, reprTest=False)
         self.roundTrip([1, 1, 1, 1, 1, 1.0, 1.0, 1.0, 1.0])
     
     def testSetRoot(self):
@@ -169,53 +152,33 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(root)
     
     def testBytes(self):
-        
-        # -- as root
-        
         self.roundTrip(b'0')
         self.roundTrip(b'')
         
-        # -- as value
-        
         self.roundTrip([b'0'])
         self.roundTrip([b''])
-        
-        # - dict
         
         self.roundTrip({'a': b'0'})
         self.roundTrip({'a': b''})
     
     def testString(self):
-        
-        # -- as root
-        
         self.roundTrip('')
         self.roundTrip('a')
         self.roundTrip('1')
-        
-        # -- as value
-        
-        # - array
         
         self.roundTrip([''])
         self.roundTrip(['a'])
         self.roundTrip(['1'])
         
-        # - dict
-        
         self.roundTrip({'a':''})
         self.roundTrip({'a':'a'})
         self.roundTrip({'1':'a'})
-        
-        # -- as key
         
         self.roundTrip({'a':'a'})
         self.roundTrip({'a':'1'})
     
     def testUnicode(self):
-        
-        # -- defaulting to 1 byte strings
-        
+        # defaulting to 1 byte strings
         if str != unicode:
             self.roundTrip(unicodeStr(r''), expected='')
             self.roundTrip(unicodeStr(r'a'), expected='a')
@@ -224,25 +187,21 @@ class TestWritePlist(unittest.TestCase):
             
             self.roundTrip({'a':unicodeStr(r'a')}, expected={'a':'a'})
             self.roundTrip({unicodeStr(r'a'):'a'}, expected={'a':'a'})
+            self.roundTrip({unicodeStr(r''):unicodeStr(r'')}, expected={'':''})
         
-        # -- as root
+        # TODO: need a 4-byte unicode character
+        self.roundTrip(unicodeStr(r'Ã¼'))
+        self.roundTrip([unicodeStr(r'Ã¼')])
+        self.roundTrip({'a':unicodeStr(r'Ã¼')})
+        self.roundTrip({unicodeStr(r'Ã¼'):'a'})
         
-        self.roundTrip(unicodeStr(r'ü'))
-        # ToDo: need a 4-byte unicode character
+        self.roundTrip(toUnicode('\u00b6'))
+        self.roundTrip([toUnicode('\u00b6')])
+        self.roundTrip({toUnicode('\u00b6'):toUnicode('\u00b6')})
         
-        # -- as value
-        
-        # - array
-        
-        self.roundTrip([unicodeStr(r'ü')])
-        
-        # - dict
-        
-        self.roundTrip({'a':unicodeStr(r'ü')})
-        
-        # -- as key
-        
-        self.roundTrip({unicodeStr(r'ü'):'a'})
+        self.roundTrip(toUnicode('\u1D161'))
+        self.roundTrip([toUnicode('\u1D161')])
+        self.roundTrip({toUnicode('\u1D161'):toUnicode('\u1D161')})
     
     def testNone(self):
         self.roundTrip(None)
@@ -250,25 +209,16 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip([None, None, None])
     
     def testBools(self):
-        
-        # -- as root
-        
         self.roundTrip(True)
         self.roundTrip(False)
         
-        # -- as value
-        
-        # - array
-        
         self.roundTrip([True, False])
         
-        # - dict
-        
-        self.roundTrip({'a':True, 'b':False})
+        self.roundTrip({'a':True, 'b':False}, reprTest=False)
     
     def testUniques(self):
         root = {'hi':'there', 'halloo':'there'}
-        self.roundTrip(root)
+        self.roundTrip(root, reprTest=False)
     
     def testAllEmpties(self):
         '''Primarily testint that an empty unicode and bytes are not mixed up'''
@@ -342,6 +292,14 @@ class TestWritePlist(unittest.TestCase):
             self.fail("2^64 should be too large for Core Foundation to handle.")
         except InvalidPlistException as e:
             pass
+    
+    def testUnicode2(self):
+        unicodeRoot = toUnicode("Mirror's Edge\u2122 for iPad")
+        self.roundTrip(unicodeRoot)
+        unicodeStrings = [toUnicode("Mirror's Edge\u2122 for iPad"), toUnicode('Weightbot \u2014 Track your Weight in Style')]
+        self.roundTrip(unicodeStrings)
+        self.roundTrip({toUnicode(""):toUnicode("")}, expected={'':''})
+        self.roundTrip(toUnicode(""), expected='')
     
     def testWriteData(self):
         self.roundTrip(Data(b"woohoo"))
