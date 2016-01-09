@@ -69,7 +69,7 @@ class TestValidPlistFile(unittest.TestCase):
     
     def testLargeDates(self):
         result = readPlist(data_path("BFPersistentEventInfo.plist"))
-        self.assertEqual(result['lastShownRatePromptDate'], datetime.datetime(1, 12, 30, 0, 0, 0))
+        self.assertEqual(result[b'lastShownRatePromptDate'], datetime.datetime(1, 12, 30, 0, 0, 0))
 
     def testKeyedArchiverPlist(self):
         """
