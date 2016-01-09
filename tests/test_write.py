@@ -195,6 +195,13 @@ class TestWritePlist(unittest.TestCase):
     
     def testWriteData(self):
         self.roundTrip(Data(b"woohoo"))
+
+    def testEmptyData(self):
+        data = Data(b'')
+        binplist = writePlistToString(data)
+        plist = readPlistFromString(binplist)
+        self.assertEqual(plist, data)
+        self.assertEqual(type(plist), type(data))
         
     def testUnicode(self):
         unicodeRoot = unicode("Mirror's Edge\u2122 for iPad")

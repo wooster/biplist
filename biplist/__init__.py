@@ -658,7 +658,7 @@ class PlistWriter(object):
             # Make one argument a float to ensure the right calculation.
             return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10.0**6) / 10.0**6
         
-        if isinstance(obj, (str, unicode)) and obj == unicodeEmpty:
+        if isinstance(obj, (str, unicode)) and not isinstance(obj, Data) and obj == unicodeEmpty:
             # The Apple Plist decoder can't decode a zero length Unicode string.
             obj = b''
        
