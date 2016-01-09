@@ -26,7 +26,7 @@ setup(
     name = 'biplist',
     version = version,
     url = 'https://bitbucket.org/wooster/biplist',
-    download_url = 'https://bitbucket.org/wooster/biplist/downloads/biplist-0.9.tar.gz',
+    download_url = 'https://bitbucket.org/wooster/biplist/downloads/biplist-%s.tar.gz' % version,
     license = 'BSD',
     description = desc,
     long_description = 
