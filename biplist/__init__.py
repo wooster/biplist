@@ -653,6 +653,11 @@ class PlistWriter(object):
                 result += pack('!B', (format << 4) | length)
             return result
         
+        def timedelta_total_seconds(td):
+            # Shim for Python 2.6 compatibility, which doesn't have total_seconds.
+            # Make one argument a float to ensure the right calculation.
+            return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10.0**6) / 10.0**6
+        
         if isinstance(obj, (str, unicode)) and obj == unicodeEmpty:
             # The Apple Plist decoder can't decode a zero length Unicode string.
             obj = b''
@@ -681,7 +686,10 @@ class PlistWriter(object):
             output += pack('!B', (0b0010 << 4) | 3)
             output += self.binaryReal(obj)
         elif isinstance(obj, datetime.datetime):
-            timestamp = (obj - apple_reference_date).total_seconds()
+            try:
+                timestamp = (obj - apple_reference_date).total_seconds()
+            except AttributeError:
+                timestamp = timedelta_total_seconds(obj - apple_reference_date)
             output += pack('!B', 0b00110011)
             output += pack('!d', float(timestamp))
         elif isinstance(obj, Data):
