@@ -202,6 +202,11 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip(toUnicode('\u1D161'))
         self.roundTrip([toUnicode('\u1D161')])
         self.roundTrip({toUnicode('\u1D161'):toUnicode('\u1D161')})
+        
+        # Smiley face emoji
+        self.roundTrip(toUnicode('\U0001f604'))
+        self.roundTrip([toUnicode('\U0001f604'), toUnicode('\U0001f604')])
+        self.roundTrip({toUnicode('\U0001f604'):toUnicode('\U0001f604')})
     
     def testNone(self):
         self.roundTrip(None)
