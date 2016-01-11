@@ -1,3 +1,8 @@
+2016-01-11 wooster v1.0.1
+-------------------------
+
+Adding back in Python 2.6 support. This will be removed again in a future version.
+
 2016-01-09 wooster v1.0.0
 -------------------------
 
