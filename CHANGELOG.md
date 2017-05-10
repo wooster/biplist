@@ -1,3 +1,8 @@
+2017-05-10 wooster v1.0.2
+-------------------------
+
+[Sort sets and dictionaries by key when writing.](https://bitbucket.org/wooster/biplist/pull-requests/6/sort-objects-before-writing/diff)
+
 2016-01-11 wooster v1.0.1
 -------------------------
 
