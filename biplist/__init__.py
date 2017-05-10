@@ -770,7 +770,7 @@ class PlistWriter(object):
                     output += proc_variable_length(0b1010, len(obj))
             
                 objectsToWrite = []
-                for objRef in obj:
+                for objRef in sorted(obj) if isinstance(obj, set) else obj:
                     (isNew, output) = self.writeObjectReference(objRef, output)
                     if isNew:
                         objectsToWrite.append(objRef)
@@ -781,7 +781,7 @@ class PlistWriter(object):
                 keys = []
                 values = []
                 objectsToWrite = []
-                for key, value in iteritems(obj):
+                for key, value in sorted(iteritems(obj)):
                     keys.append(key)
                     values.append(value)
                 for key in keys:
