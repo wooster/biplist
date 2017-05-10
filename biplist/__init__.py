@@ -507,6 +507,9 @@ class StringWrapper(object):
         else:
             return len(self.encodedValue)//2
     
+    def __lt__(self, other):
+        return self.encodedValue < other.encodedValue
+    
     @property
     def encodingMarker(self):
         if self.encoding == 'ascii':
