@@ -71,6 +71,11 @@ class TestValidPlistFile(unittest.TestCase):
         result = readPlist(data_path("BFPersistentEventInfo.plist"))
         self.assertEqual(result['lastShownRatePromptDate'], datetime.datetime(1, 12, 30, 0, 0, 0))
 
+    def testSmallDates(self):
+        result = readPlist(data_path("small_date.plist"))
+        # Date stored in plist is 0000-12-30T00:00:00Z
+        self.assertEqual(result, {'MyDate': datetime.datetime(1, 1, 1, 0, 0)})
+
     def testKeyedArchiverPlist(self):
         """
         Archive is created with class like this:

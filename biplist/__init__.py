@@ -406,9 +406,15 @@ class PlistReader(object):
         return data.decode('utf_16_be')
     
     def readDate(self):
-        result = unpack(">d", self.contents[self.currentOffset:self.currentOffset+8])[0]
+        x = unpack(">d", self.contents[self.currentOffset:self.currentOffset+8])[0]
         # Use timedelta to workaround time_t size limitation on 32-bit python.
-        result = datetime.timedelta(seconds=result) + apple_reference_date
+        try:
+            result = datetime.timedelta(seconds=x) + apple_reference_date
+        except OverflowError:
+            if x > 0:
+                result = datetime.datetime.max
+            else:
+                result = datetime.datetime.min
         self.currentOffset += 8
         return result
     
