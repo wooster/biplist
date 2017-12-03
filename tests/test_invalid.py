@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from biplist import *
 from biplist import PlistTrailer
 from collections import namedtuple

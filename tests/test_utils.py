@@ -1,9 +1,14 @@
+# -*- coding: utf-8 -*-
+
 import os
 import subprocess
 import sys
 
 def data_path(path):
     return os.path.join(os.path.dirname(globals()["__file__"]), 'data', path)
+
+def fuzz_data_path(path):
+    return os.path.join(os.path.dirname(globals()["__file__"]), 'fuzz_data', path)
 
 def run_command(args, verbose = False):
     """Runs the command and returns the status and the output."""

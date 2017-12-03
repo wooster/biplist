@@ -222,6 +222,8 @@ class PlistReader(object):
     offsets = None
     trailer = None
     currentOffset = 0
+    # Used to detect recursive object references.
+    offsetStack = []
     
     def __init__(self, fileOrStream):
         """Raises NotBinaryPlistException."""
@@ -236,6 +238,7 @@ class PlistReader(object):
         self.contents = ''
         self.offsets = []
         self.currentOffset = 0
+        self.offsetsStack = []
     
     def readRoot(self):
         result = None
@@ -280,10 +283,16 @@ class PlistReader(object):
             
             offset_contents = self.contents[offset:offset+offset_size]
             offset_i = 0
+            offset_table_length = len(offset_contents)
             
             while offset_i < self.trailer.offsetCount:
                 begin = self.trailer.offsetSize*offset_i
-                tmp_contents = offset_contents[begin:begin+self.trailer.offsetSize]
+                end = begin+self.trailer.offsetSize
+                #if begin >= offset_table_length:
+                #    raise InvalidPlistException("Beginning of object is at invalid offset %d in offset table of length %d" % (begin, offset_table_length))
+                if end > offset_table_length:
+                    raise InvalidPlistException("End of object is at invalid offset %d in offset table of length %d" % (end, offset_table_length))
+                tmp_contents = offset_contents[begin:end]
                 tmp_sized = self.getSizedInteger(tmp_contents, self.trailer.offsetSize)
                 self.offsets.append(tmp_sized)
                 offset_i += 1
@@ -294,11 +303,29 @@ class PlistReader(object):
         return result
     
     def setCurrentOffsetToObjectNumber(self, objectNumber):
+        if objectNumber > len(self.offsets) - 1:
+            raise InvalidPlistException("Invalid offset number: %d" % objectNumber)
         self.currentOffset = self.offsets[objectNumber]
+        if self.currentOffset in self.offsetsStack:
+            raise InvalidPlistException("Recursive data structure detected in object: %d" % objectNumber)
+    
+    def beginOffsetProtection(self):
+        self.offsetsStack.append(self.currentOffset)
+        return self.currentOffset
+    
+    def endOffsetProtection(self, offset):
+        try:
+            index = self.offsetsStack.index(offset)
+            self.offsetsStack = self.offsetsStack[:index]
+        except ValueError as e:
+            pass
     
     def readObject(self):
+        protection = self.beginOffsetProtection()
         result = None
         tmp_byte = self.contents[self.currentOffset:self.currentOffset+1]
+        if len(tmp_byte) != 1:
+            raise InvalidPlistException("No object found at offset: %d" % self.currentOffset)
         marker_byte = unpack("!B", tmp_byte)[0]
         format = (marker_byte >> 4) & 0x0f
         extra = marker_byte & 0x0f
@@ -362,6 +389,7 @@ class PlistReader(object):
             result = self.readDict(extra)
         else:    
             raise InvalidPlistException("Invalid object found: {format: %s, extra: %s}" % (bin(format), bin(extra)))
+        self.endOffsetProtection(protection)
         return result
     
     def readInteger(self, byteSize):
@@ -373,6 +401,8 @@ class PlistReader(object):
         return result
     
     def readReal(self, length):
+        if not isinstance(length, (int, long)):
+            raise InvalidPlistException("Length of real isn't of integer type.")
         result = 0.0
         to_read = pow(2, length)
         data = self.contents[self.currentOffset:self.currentOffset+to_read]
@@ -396,6 +426,8 @@ class PlistReader(object):
         return refs
     
     def readArray(self, count):
+        if not isinstance(count, (int, long)):
+            raise InvalidPlistException("Count of entries in dict isn't of integer type.")
         result = []
         values = self.readRefs(count)
         i = 0
@@ -407,6 +439,8 @@ class PlistReader(object):
         return result
     
     def readDict(self, count):
+        if not isinstance(count, (int, long)):
+            raise InvalidPlistException("Count of keys/values in dict isn't of integer type.")
         result = {}
         keys = self.readRefs(count)
         values = self.readRefs(count)
@@ -421,12 +455,21 @@ class PlistReader(object):
         return result
     
     def readAsciiString(self, length):
-        result = unpack("!%ds" % length, self.contents[self.currentOffset:self.currentOffset+length])[0]
+        offset = self.currentOffset+length
+        if offset >= len(self.contents) - 32:
+            raise InvalidPlistException("Ascii string extends into trailer")
+        if offset < 0:
+            raise InvalidPlistException("Ascii string length is less than zero")
+        print(length)
+        result = unpack("!%ds" % length, self.contents[self.currentOffset:offset])[0]
         self.currentOffset += length
         return str(result.decode('ascii'))
     
     def readUnicode(self, length):
         actual_length = length*2
+        offset = self.currentOffset+length
+        #if offset >= len(self.contents) - 32:
+        #    raise InvalidPlistException("Unicode string extends into trailer")
         data = self.contents[self.currentOffset:self.currentOffset+actual_length]
         # unpack not needed?!! data = unpack(">%ds" % (actual_length), data)[0]
         self.currentOffset += actual_length
@@ -434,6 +477,8 @@ class PlistReader(object):
     
     def readDate(self):
         x = unpack(">d", self.contents[self.currentOffset:self.currentOffset+8])[0]
+        if math.isnan(x):
+            raise InvalidPlistException("Date is NaN")
         # Use timedelta to workaround time_t size limitation on 32-bit python.
         try:
             result = datetime.timedelta(seconds=x) + apple_reference_date
@@ -456,8 +501,10 @@ class PlistReader(object):
     def getSizedInteger(self, data, byteSize, as_number=False):
         """Numbers of 8 bytes are signed integers when they refer to numbers, but unsigned otherwise."""
         result = 0
+        if byteSize == 0:
+            raise InvalidPlistException("Encountered integer with byte size of 0.")
         # 1, 2, and 4 byte integers are unsigned
-        if byteSize == 1:
+        elif byteSize == 1:
             result = unpack('>B', data)[0]
         elif byteSize == 2:
             result = unpack('>H', data)[0]
