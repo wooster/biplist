@@ -19,7 +19,7 @@ if major <= 1 or (major == 2 and minor < 6) or (major == 3 and minor < 4):
 
 author = 'Andrew Wooster'
 email = 'andrew@planetaryscale.com'
-version = '1.0.2'
+version = '1.0.3'
 desc = 'biplist is a library for reading/writing binary plists.'
 
 setup(

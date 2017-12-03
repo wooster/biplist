@@ -288,8 +288,6 @@ class PlistReader(object):
             while offset_i < self.trailer.offsetCount:
                 begin = self.trailer.offsetSize*offset_i
                 end = begin+self.trailer.offsetSize
-                #if begin >= offset_table_length:
-                #    raise InvalidPlistException("Beginning of object is at invalid offset %d in offset table of length %d" % (begin, offset_table_length))
                 if end > offset_table_length:
                     raise InvalidPlistException("End of object is at invalid offset %d in offset table of length %d" % (end, offset_table_length))
                 tmp_contents = offset_contents[begin:end]
@@ -333,7 +331,6 @@ class PlistReader(object):
         
         def proc_extra(extra):
             if extra == 0b1111:
-                #self.currentOffset += 1
                 extra = self.readObject()
             return extra
         
@@ -351,11 +348,9 @@ class PlistReader(object):
                 raise InvalidPlistException("Invalid object found at offset: %d" % (self.currentOffset - 1))
         # int
         elif format == 0b0001:
-            extra = proc_extra(extra)
             result = self.readInteger(pow(2, extra))
         # real
         elif format == 0b0010:
-            extra = proc_extra(extra)
             result = self.readReal(extra)
         # date
         elif format == 0b0011 and extra == 0b0011:
@@ -392,33 +387,36 @@ class PlistReader(object):
         self.endOffsetProtection(protection)
         return result
     
+    def readContents(self, length, description="Object contents"):
+        end = self.currentOffset + length
+        if end >= len(self.contents) - 32:
+            raise InvalidPlistException("%s extends into trailer" % description)
+        elif length < 0:
+            raise InvalidPlistException("%s length is less than zero" % length)
+        data = self.contents[self.currentOffset:end]
+        return data
+    
     def readInteger(self, byteSize):
-        result = 0
-        original_offset = self.currentOffset
-        data = self.contents[self.currentOffset:self.currentOffset + byteSize]
-        result = self.getSizedInteger(data, byteSize, as_number=True)
-        self.currentOffset = original_offset + byteSize
-        return result
+        data = self.readContents(byteSize, "Integer")
+        self.currentOffset = self.currentOffset + byteSize
+        return self.getSizedInteger(data, byteSize, as_number=True)
     
     def readReal(self, length):
-        if not isinstance(length, (int, long)):
-            raise InvalidPlistException("Length of real isn't of integer type.")
-        result = 0.0
         to_read = pow(2, length)
-        data = self.contents[self.currentOffset:self.currentOffset+to_read]
+        data = self.readContents(to_read, "Real")
         if length == 2: # 4 bytes
             result = unpack('>f', data)[0]
         elif length == 3: # 8 bytes
             result = unpack('>d', data)[0]
         else:
-            raise InvalidPlistException("Unknown real of length %d bytes" % to_read)
+            raise InvalidPlistException("Unknown Real of length %d bytes" % to_read)
         return result
     
     def readRefs(self, count):    
         refs = []
         i = 0
         while i < count:
-            fragment = self.contents[self.currentOffset:self.currentOffset+self.trailer.objectRefSize]
+            fragment = self.readContents(self.trailer.objectRefSize, "Object reference")
             ref = self.getSizedInteger(fragment, len(fragment))
             refs.append(ref)
             self.currentOffset += self.trailer.objectRefSize
@@ -455,28 +453,24 @@ class PlistReader(object):
         return result
     
     def readAsciiString(self, length):
-        offset = self.currentOffset+length
-        if offset >= len(self.contents) - 32:
-            raise InvalidPlistException("Ascii string extends into trailer")
-        if offset < 0:
-            raise InvalidPlistException("Ascii string length is less than zero")
-        print(length)
-        result = unpack("!%ds" % length, self.contents[self.currentOffset:offset])[0]
+        if not isinstance(length, (int, long)):
+            raise InvalidPlistException("Length of ASCII string isn't of integer type.")
+        data = self.readContents(length, "ASCII string")
+        result = unpack("!%ds" % length, data)[0]
         self.currentOffset += length
         return str(result.decode('ascii'))
     
     def readUnicode(self, length):
+        if not isinstance(length, (int, long)):
+            raise InvalidPlistException("Length of Unicode string isn't of integer type.")
         actual_length = length*2
-        offset = self.currentOffset+length
-        #if offset >= len(self.contents) - 32:
-        #    raise InvalidPlistException("Unicode string extends into trailer")
-        data = self.contents[self.currentOffset:self.currentOffset+actual_length]
-        # unpack not needed?!! data = unpack(">%ds" % (actual_length), data)[0]
+        data = self.readContents(actual_length, "Unicode string")
         self.currentOffset += actual_length
         return data.decode('utf_16_be')
     
     def readDate(self):
-        x = unpack(">d", self.contents[self.currentOffset:self.currentOffset+8])[0]
+        data = self.readContents(8, "Date")
+        x = unpack(">d", data)[0]
         if math.isnan(x):
             raise InvalidPlistException("Date is NaN")
         # Use timedelta to workaround time_t size limitation on 32-bit python.
@@ -491,11 +485,15 @@ class PlistReader(object):
         return result
     
     def readData(self, length):
-        result = self.contents[self.currentOffset:self.currentOffset+length]
+        if not isinstance(length, (int, long)):
+            raise InvalidPlistException("Length of data isn't of integer type.")
+        result = self.readContents(length, "Data")
         self.currentOffset += length
         return Data(result)
     
     def readUid(self, length):
+        if not isinstance(length, (int, long)):
+            raise InvalidPlistException("Uid length isn't of integer type.")
         return Uid(self.readInteger(length+1))
     
     def getSizedInteger(self, data, byteSize, as_number=False):
