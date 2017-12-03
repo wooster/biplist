@@ -250,10 +250,37 @@ class PlistReader(object):
         trailerContents = self.contents[-32:]
         try:
             self.trailer = PlistTrailer._make(unpack("!xxxxxxBBQQQ", trailerContents))
+            
+            if pow(2, self.trailer.offsetSize*8) < self.trailer.offsetTableOffset:
+                raise InvalidPlistException("Offset size insufficient to reference all objects.")
+            
+            if pow(2, self.trailer.objectRefSize*8) < self.trailer.offsetCount:
+                raise InvalidPlistException("Too many offsets to represent in size of object reference representation.")
+            
             offset_size = self.trailer.offsetSize * self.trailer.offsetCount
             offset = self.trailer.offsetTableOffset
+            
+            if offset + offset_size > pow(2, 64):
+                raise InvalidPlistException("Offset table is excessively long.")
+            
+            if self.trailer.offsetSize > 16:
+                raise InvalidPlistException("Offset size is greater than maximum integer size.")
+            
+            if self.trailer.objectRefSize == 0:
+                raise InvalidPlistException("Object reference size is zero.")
+            
+            if offset >= len(self.contents) - 32:
+                raise InvalidPlistException("Offset table offset is too large.")
+            
+            if offset < len("bplist00x"):
+                raise InvalidPlistException("Offset table offset is too small.")
+            
+            if self.trailer.topLevelObjectNumber >= self.trailer.offsetCount:
+                raise InvalidPlistException("Top level object number is larger than the number of objects.")
+            
             offset_contents = self.contents[offset:offset+offset_size]
             offset_i = 0
+            
             while offset_i < self.trailer.offsetCount:
                 begin = self.trailer.offsetSize*offset_i
                 tmp_contents = offset_contents[begin:begin+self.trailer.offsetSize]

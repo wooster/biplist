@@ -57,6 +57,10 @@ class TestValidPlistFile(unittest.TestCase):
         result = readPlist(data_path('unicode_empty.plist'))
         self.assertEqual(result, '')
     
+    def testBoolOnly(self):
+        result = readPlist(data_path('bool_only_binary.plist'))
+        self.assertEqual(result, False)
+    
     def testSmallReal(self):
         result = readPlist(data_path('small_real.plist'))
         self.assertEqual(result, {'4 byte real':0.5})
