@@ -223,7 +223,7 @@ class PlistReader(object):
     trailer = None
     currentOffset = 0
     # Used to detect recursive object references.
-    offsetStack = []
+    offsetsStack = []
     
     def __init__(self, fileOrStream):
         """Raises NotBinaryPlistException."""
@@ -608,6 +608,8 @@ class PlistWriter(object):
     referencePositions = None
     wrappedTrue = None
     wrappedFalse = None
+    # Used to detect recursive object references.
+    objectsStack = []
     
     def __init__(self, file):
         self.reset()
@@ -625,6 +627,8 @@ class PlistWriter(object):
         self.writtenReferences = {}
         # A dict of the positions of the written uniques.
         self.referencePositions = {}
+        
+        self.objectsStack = []
         
     def positionOfObjectReference(self, obj):
         """If the given object has been written already, return its
@@ -666,39 +670,61 @@ class PlistWriter(object):
         output = self.writeOffsetTable(output)
         output += pack('!xxxxxxBBQQQ', *self.trailer)
         self.file.write(output)
+    
+    def beginRecursionProtection(self, obj):
+        if not isinstance(obj, (set, dict, list, tuple)):
+            return
+        if id(obj) in self.objectsStack:
+            raise InvalidPlistException("Recursive containers are not allowed in plists.")
+        self.objectsStack.append(id(obj))
+    
+    def endRecursionProtection(self, obj):
+        if not isinstance(obj, (set, dict, list, tuple)):
+            return
+        try:
+            index = self.objectsStack.index(id(obj))
+            self.objectsStack = self.objectsStack[:index]
+        except ValueError as e:
+            pass
 
     def wrapRoot(self, root):
+        result = None
+        self.beginRecursionProtection(root)
+        
         if isinstance(root, bool):
             if root is True:
-                return self.wrappedTrue
+                result = self.wrappedTrue
             else:
-                return self.wrappedFalse
+                result = self.wrappedFalse
         elif isinstance(root, float):
-            return FloatWrapper(root)
+            result = FloatWrapper(root)
         elif isinstance(root, set):
             n = set()
             for value in root:
                 n.add(self.wrapRoot(value))
-            return HashableWrapper(n)
+            result = HashableWrapper(n)
         elif isinstance(root, dict):
             n = {}
             for key, value in iteritems(root):
                 n[self.wrapRoot(key)] = self.wrapRoot(value)
-            return HashableWrapper(n)
+            result = HashableWrapper(n)
         elif isinstance(root, list):
             n = []
             for value in root:
                 n.append(self.wrapRoot(value))
-            return HashableWrapper(n)
+            result = HashableWrapper(n)
         elif isinstance(root, tuple):
             n = tuple([self.wrapRoot(value) for value in root])
-            return HashableWrapper(n)
+            result = HashableWrapper(n)
         elif isinstance(root, (str, unicode)) and not isinstance(root, Data):
-            return StringWrapper(root)
+            result =  StringWrapper(root)
         elif isinstance(root, bytes):
-            return Data(root)
+            result = Data(root)
         else:
-            return root
+            result = root
+        
+        self.endRecursionProtection(root)
+        return result
 
     def incrementByteCount(self, field, incr=1):
         self.byteCounts = self.byteCounts._replace(**{field:self.byteCounts.__getattribute__(field) + incr})

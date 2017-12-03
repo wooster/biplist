@@ -1,7 +1,7 @@
 2017-12-03 wooster v1.0.3
 -------------------------
 
-Added additional checks to guard against invalid plists.
+Added additional checks to guard against invalid plists. This includes writing and reading plists with recursive collections.
 
 [Handle OverflowErrors when reading dates outside the range of datetime.datetime](https://bitbucket.org/wooster/biplist/pull-requests/7/handle-overflowerrors-when-reading-dates/diff)
 

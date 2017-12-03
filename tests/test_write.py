@@ -1,7 +1,12 @@
-#!/usr/local/env python
 # -*- coding: utf-8 -*-
 
-import datetime, io, os, subprocess, sys, tempfile, unittest
+import datetime
+import io
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
 
 from biplist import *
 from biplist import PlistWriter
@@ -21,6 +26,8 @@ except NameError:
     xrange = range
 
 class TestWritePlist(unittest.TestCase):
+    def setUp(self):
+        pass
     
     def roundTrip(self, case, xml=False, expected=None, reprTest=True):
         # reprTest may fail randomly if True and the values being encoded include a dictionary with more
@@ -332,6 +339,20 @@ class TestWritePlist(unittest.TestCase):
         self.roundTrip([Uid(1), 1])
         self.roundTrip([1, Uid(1)])
         self.roundTrip([Uid(1), Uid(1)])
+    
+    def testRecursiveWrite(self):
+        # Apple libraries disallow recursive containers, so we should fail on
+        # trying to write those.
+        root = []
+        child = [root]
+        root.extend(child)
+        try:
+            writePlistToString(root)
+            self.fail("Should not be able to write plists with recursive containers.")
+        except InvalidPlistException as e:
+            pass
+        except:
+            self.fail("Should get an invalid plist exception for recursive containers.")
 
 if __name__ == '__main__':
     unittest.main()
