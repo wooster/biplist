@@ -38,7 +38,7 @@ class TestWritePlist(unittest.TestCase):
         self.assertTrue(len(plist) > 0)
         
         # confirm that lint is happy with the result
-        self.lintPlist(plist)        
+        self.lintPlist(plist)
         
         # convert back
         readResult = readPlistFromString(plist)
@@ -353,6 +353,16 @@ class TestWritePlist(unittest.TestCase):
             pass
         except:
             self.fail("Should get an invalid plist exception for recursive containers.")
+    
+    def testSortedWrite(self):
+        # Ensure we're generating reproducible output.
+        header = PlistWriter.header
+        PlistWriter.header = b'bplist00'
+        root = [set(['b', 'c', 'a']), {"a":1, "b":2, "c":3}]
+        binplist = writePlistToString(root)
+        PlistWriter.header = header
+        expected = open(data_path('sorted.plist'), 'rb').read()
+        self.assertEqual(binplist, expected)
 
 if __name__ == '__main__':
     unittest.main()
